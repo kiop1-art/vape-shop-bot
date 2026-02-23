@@ -149,6 +149,7 @@ async function start() {
       [{ text: '🗑️ Удалить товар', callback_data: 'admin_delete_product' }],
       [{ text: '📰 Новости', callback_data: 'admin_news' }],
       [{ text: '🎁 Промокоды', callback_data: 'admin_promocodes' }],
+      [{ text: '📨 Рассылка', callback_data: 'admin_broadcast' }],
       [{ text: '⚙️ Настройки', callback_data: 'admin_settings' }]
     ]
   };
@@ -500,6 +501,78 @@ ${statusEmojis[order.status] || '📦'} <b>Завершённый</b>
       return;
     }
 
+    // === РАССЫЛКА ===
+    if (data === 'admin_broadcast') {
+      adminState[chatId] = { step: 0, type: 'broadcast' };
+      bot.sendMessage(chatId, '📨 <b>Рассылка всем пользователям</b>\n\nОтправьте текст сообщения (можно с фото, видео, файлами):', {
+        parse_mode: 'HTML',
+        reply_markup: { keyboard: [['❌ Отмена']], resize_keyboard: true }
+      });
+      return;
+    }
+
+    if (state.type === 'broadcast') {
+      if (state.step === 0) {
+        state.message = msg;
+        state.step = 1;
+        bot.sendMessage(chatId, '📨 Отправляем сообщение всем пользователям?\n\nНажмите "Да" для подтверждения:', {
+          reply_markup: { inline_keyboard: [[{ text: '✅ Да', callback_data: 'broadcast_confirm' }], [{ text: '❌ Нет', callback_data: 'broadcast_cancel' }]] }
+        });
+        return;
+      }
+    }
+
+    if (data === 'broadcast_confirm') {
+      const state = adminState[chatId];
+      if (!state || state.type !== 'broadcast') return;
+      
+      bot.deleteMessage(chatId, msgId);
+      bot.sendMessage(chatId, '📨 Рассылка началась...');
+      
+      const users = db.prepare('SELECT telegram_id FROM users').all();
+      let success = 0;
+      let failed = 0;
+      
+      users.forEach((u, i) => {
+        try {
+          if (state.message.text) {
+            bot.sendMessage(u.telegram_id, state.message.text, { parse_mode: 'HTML' });
+          }
+          if (state.message.photo) {
+            bot.sendPhoto(u.telegram_id, state.message.photo[state.message.photo.length - 1].file_id);
+          }
+          if (state.message.document) {
+            bot.sendDocument(u.telegram_id, state.message.document.file_id);
+          }
+          success++;
+        } catch (e) {
+          failed++;
+        }
+        
+        // Прогресс каждые 50 сообщений
+        if ((i + 1) % 50 === 0) {
+          bot.sendMessage(chatId, `📨 Прогресс: ${i + 1}/${users.length}`);
+        }
+      });
+      
+      bot.sendMessage(chatId, `✅ <b>Рассылка завершена!</b>\n\n📤 Отправлено: ${success}\n❌ Ошибок: ${failed}\n👥 Всего: ${users.length}`, {
+        parse_mode: 'HTML',
+        reply_markup: { inline_keyboard: [[{ text: '🔙 В меню', callback_data: 'admin_menu' }]] }
+      });
+      
+      delete adminState[chatId];
+      return;
+    }
+
+    if (data === 'broadcast_cancel') {
+      delete adminState[chatId];
+      bot.deleteMessage(chatId, msgId);
+      bot.sendMessage(chatId, '❌ Рассылка отменена', {
+        reply_markup: adminKbd
+      });
+      return;
+    }
+
     // === ПРОМОКОДЫ ===
     if (data === 'admin_promocodes') {
       bot.sendMessage(chatId, '🎁 <b>Промокоды</b>', {
@@ -650,19 +723,55 @@ ${statusEmojis[order.status] || '📦'} <b>Завершённый</b>
       if (state.step === 3) {
         const cat = parseInt(text);
         if (![1,2,3,4].includes(cat)) { bot.sendMessage(chatId, '❌ Введите 1-4:'); return; }
-        state.category_id = cat; state.step = 4; bot.sendMessage(chatId, '5️⃣ Фото или "пропустить":'); return;
+        state.category_id = cat; state.step = 4; bot.sendMessage(chatId, '5️⃣ Отправьте ФОТО товара (как файл) или напишите "пропустить":'); return;
       }
       if (state.step === 4) {
-        if (text?.toLowerCase() === 'пропустить') { state.image_url = null; }
-        else if (msg.photo?.length) { state.image_url = (await bot.getFileLink(msg.photo[msg.photo.length-1].file_id)).href; }
-        else { bot.sendMessage(chatId, '❌ Фото или "пропустить":'); return; }
-        
-        db.prepare('INSERT INTO products (category_id, name, description, price, image_url, stock) VALUES (?, ?, ?, ?, ?, ?)')
-          .run(state.category_id, state.name, state.description, state.price, state.image_url, 100);
-        
-        bot.sendMessage(chatId, `✅ Товар добавлен!\n\n📦 ${escapeHtml(state.name)}\n💰 ${formatPrice(state.price)}`, {
-          reply_markup: { inline_keyboard: [[{ text: '➕ Ещё', callback_data: 'add_product' }], [{ text: '🔙 В меню', callback_data: 'admin_menu' }]] }
-        });
+        // Обработка фото
+        if (text && text.toLowerCase() === 'пропустить') {
+          state.image_url = null;
+          state.step = 6;
+        } else if (msg.photo && msg.photo.length > 0) {
+          // Получаем фото в максимальном качестве
+          const photo = msg.photo[msg.photo.length - 1];
+          bot.getFileLink(photo.file_id).then(fileLink => {
+            state.image_url = fileLink.href;
+            console.log('✅ Фото товара загружено:', state.image_url);
+            state.step = 6;
+          }).catch(err => {
+            console.error('❌ Ошибка загрузки фото:', err);
+            bot.sendMessage(chatId, '❌ Ошибка загрузки фото. Попробуйте ещё раз или "пропустить":');
+            return;
+          });
+          return;
+        } else if (msg.document && msg.document.mime_type.startsWith('image/')) {
+          // Если отправили как документ
+          const doc = msg.document;
+          bot.getFileLink(doc.file_id).then(fileLink => {
+            state.image_url = fileLink.href;
+            console.log('✅ Фото товара (документ) загружено:', state.image_url);
+            state.step = 6;
+          }).catch(err => {
+            console.error('❌ Ошибка загрузки фото:', err);
+            bot.sendMessage(chatId, '❌ Ошибка загрузки фото. Попробуйте ещё раз или "пропустить":');
+            return;
+          });
+          return;
+        } else {
+          bot.sendMessage(chatId, '❌ Отправьте ФОТО (как файл или изображение) или напишите "пропустить":');
+          return;
+        }
+      }
+      if (state.step === 6) {
+        try {
+          db.prepare('INSERT INTO products (category_id, name, description, price, image_url, stock) VALUES (?, ?, ?, ?, ?, ?)')
+            .run(state.category_id, state.name, state.description, state.price, state.image_url, 100);
+          
+          bot.sendMessage(chatId, `✅ Товар добавлен!\n\n📦 ${escapeHtml(state.name)}\n💰 ${formatPrice(state.price)}\n${state.image_url ? '🖼️ Фото: загружено' : '🖼️ Фото: нет'}`, {
+            reply_markup: { inline_keyboard: [[{ text: '➕ Ещё', callback_data: 'add_product' }], [{ text: '🔙 В меню', callback_data: 'admin_menu' }]] }
+          });
+        } catch (e) {
+          bot.sendMessage(chatId, `❌ Ошибка: ${escapeHtml(e.message)}`);
+        }
         delete adminState[chatId];
       }
     }
@@ -670,16 +779,49 @@ ${statusEmojis[order.status] || '📦'} <b>Завершённый</b>
     // === ДОБАВЛЕНИЕ НОВОСТИ ===
     if (state.type === 'news') {
       if (state.step === 0) { state.title = text; state.step = 1; bot.sendMessage(chatId, '2️⃣ Текст новости:'); return; }
-      if (state.step === 1) { state.content = text; state.step = 2; bot.sendMessage(chatId, '3️⃣ Фото или "пропустить":'); return; }
+      if (state.step === 1) { state.content = text; state.step = 2; bot.sendMessage(chatId, '3️⃣ Отправьте ФОТО новости или напишите "пропустить":'); return; }
       if (state.step === 2) {
-        if (text?.toLowerCase() === 'пропустить') { state.image_url = null; }
-        else if (msg.photo?.length) { state.image_url = (await bot.getFileLink(msg.photo[msg.photo.length-1].file_id)).href; }
-        else { bot.sendMessage(chatId, '❌ Фото или "пропустить":'); return; }
-        
-        db.prepare('INSERT INTO news (title, content, image_url) VALUES (?, ?, ?)').run(state.title, state.content, state.image_url);
-        bot.sendMessage(chatId, `✅ Новость добавлена!\n\n📰 ${escapeHtml(state.title)}`, {
-          reply_markup: { inline_keyboard: [[{ text: '🔙 В меню', callback_data: 'admin_menu' }]] }
-        });
+        if (text && text.toLowerCase() === 'пропустить') {
+          state.image_url = null;
+          state.step = 4;
+        } else if (msg.photo && msg.photo.length > 0) {
+          const photo = msg.photo[msg.photo.length - 1];
+          bot.getFileLink(photo.file_id).then(fileLink => {
+            state.image_url = fileLink.href;
+            console.log('✅ Фото новости загружено:', state.image_url);
+            state.step = 4;
+          }).catch(err => {
+            console.error('❌ Ошибка загрузки фото:', err);
+            bot.sendMessage(chatId, '❌ Ошибка загрузки фото. Попробуйте ещё раз или "пропустить":');
+            return;
+          });
+          return;
+        } else if (msg.document && msg.document.mime_type.startsWith('image/')) {
+          const doc = msg.document;
+          bot.getFileLink(doc.file_id).then(fileLink => {
+            state.image_url = fileLink.href;
+            console.log('✅ Фото новости (документ) загружено:', state.image_url);
+            state.step = 4;
+          }).catch(err => {
+            console.error('❌ Ошибка загрузки фото:', err);
+            bot.sendMessage(chatId, '❌ Ошибка загрузки фото. Попробуйте ещё раз или "пропустить":');
+            return;
+          });
+          return;
+        } else {
+          bot.sendMessage(chatId, '❌ Отправьте ФОТО или напишите "пропустить":');
+          return;
+        }
+      }
+      if (state.step === 4) {
+        try {
+          db.prepare('INSERT INTO news (title, content, image_url) VALUES (?, ?, ?)').run(state.title, state.content, state.image_url);
+          bot.sendMessage(chatId, `✅ Новость добавлена!\n\n📰 ${escapeHtml(state.title)}${state.image_url ? '\n🖼️ Фото: загружено' : ''}`, {
+            reply_markup: { inline_keyboard: [[{ text: '🔙 В меню', callback_data: 'admin_menu' }]] }
+          });
+        } catch (e) {
+          bot.sendMessage(chatId, `❌ Ошибка: ${escapeHtml(e.message)}`);
+        }
         delete adminState[chatId];
       }
     }
