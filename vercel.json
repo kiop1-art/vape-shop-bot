@@ -1,9 +1,11 @@
 {
   "version": 2,
   "builds": [
-    { "src": "bot/index.js", "use": "@vercel/node" }
+    { "src": "api/vercel-bot.js", "use": "@vercel/node" }
   ],
   "routes": [
-    { "src": "/(.*)", "dest": "bot/index.js" }
+    { "src": "/api/(.*)", "dest": "api/vercel-bot.js" },
+    { "src": "/webhook", "dest": "api/vercel-bot.js" },
+    { "src": "/(.*)", "dest": "webapp/$1" }
   ]
 }

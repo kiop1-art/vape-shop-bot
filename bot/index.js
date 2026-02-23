@@ -78,8 +78,9 @@ async function start() {
 
   function escapeMarkdown(text) {
     if (!text) return '';
-    // Экранируем специальные символы Markdown
+    // Экранируем специальные символы Markdown v1
     return String(text)
+      .replace(/\\/g, '\\\\')
       .replace(/_/g, '\\_')
       .replace(/\*/g, '\\*')
       .replace(/\[/g, '\\[')
@@ -97,7 +98,8 @@ async function start() {
       .replace(/\{/g, '\\{')
       .replace(/\}/g, '\\}')
       .replace(/\./g, '\\.')
-      .replace(/!/g, '\\!');
+      .replace(/!/g, '\\!')
+      .replace(/&/g, '\\&');
   }
   
   function isAdmin(userId) { 
@@ -416,10 +418,11 @@ ${itemsText}`, {
     }
     orders.forEach(order => {
       const items = db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(order.id);
-      const itemsText = items.map(i => `• ${i.product_name} x${i.quantity} — ${formatPrice(i.price * i.quantity)}`).join('\n');
+      const itemsText = items.map(i => `• ${escapeMarkdown(i.product_name)} x${i.quantity} — ${formatPrice(i.price * i.quantity)}`).join('\n');
+      const name = escapeMarkdown([order.first_name, order.last_name].filter(Boolean).join(' ') || 'Без имени');
       bot.sendMessage(msg.chat.id, `📦 #${order.order_uuid.substring(0, 8)}
 
-👤 ${order.first_name} (\`${order.telegram_id}\`)
+👤 ${name} (\`${order.telegram_id}\`)
 💰 ${formatPrice(order.total_amount)}
 📊 ${getStatusEmoji(order.status)} ${order.status}
 
@@ -894,22 +897,22 @@ ${state.max_uses ? `🔢 Лимит: ${state.max_uses} раз` : '🔢 Безл�
     items.forEach(item => itemStmt.run(orderId, item.product_id, item.name, item.quantity, item.price));
     
     adminIds.forEach(adminId => {
-      const itemsText = items.map(i => `• ${i.name} x${i.quantity} — ${formatPrice(i.price * i.quantity)}`).join('\n');
+      const itemsText = items.map(i => `• ${escapeMarkdown(i.name)} x${i.quantity} — ${formatPrice(i.price * i.quantity)}`).join('\n');
       bot.sendMessage(adminId, `🔔 **Новый заказ!**
 
 📦 #${orderUuid.substring(0, 8)}
-👤 ${userId}
+👤 \`${userId}\`
 💰 ${formatPrice(totalAmount)}
-📍 ${deliveryAddress || '—'}
-📞 ${contactInfo || '—'}
-${promocode ? `🎁 Промокод: ${promocode}` : ''}
+📍 ${escapeMarkdown(deliveryAddress) || '—'}
+📞 ${escapeMarkdown(contactInfo) || '—'}
+${promocode ? `🎁 Промокод: ${escapeMarkdown(promocode)}` : ''}
 
 🛒 ${itemsText}`, {
         parse_mode: 'Markdown',
         reply_markup: keyboards.orderStatusKeyboard(orderId, 'pending')
       });
     });
-    
+
     bot.sendMessage(userId, `✅ **Заказ #${orderUuid.substring(0, 8)} принят!**`, {
       parse_mode: 'Markdown'
     });
