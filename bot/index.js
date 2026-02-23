@@ -46,17 +46,21 @@ function escapeHtml(text) {
 async function start() {
   await db.initDatabase();
   
-  // Создаём таблицу настроек
-  db.run(`CREATE TABLE IF NOT EXISTS settings (
-    key TEXT PRIMARY KEY,
-    value TEXT,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  )`);
+  // Создаём таблицу настроек если нет
+  try {
+    db.exec(`CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+  } catch(e) {
+    console.log('Таблица settings уже существует или ошибка:', e.message);
+  }
   
   // Устанавливаем канал по умолчанию если нет
   const existingChannel = db.prepare('SELECT value FROM settings WHERE key = ?').get('channel_id');
   if (!existingChannel) {
-    db.prepare('INSERT INTO settings (key, value) VALUES (?, ?)').run('channel_id', DEFAULT_CHANNEL);
+    db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('channel_id', DEFAULT_CHANNEL);
   }
   
   console.log('=== НАСТРОЙКИ ===');
