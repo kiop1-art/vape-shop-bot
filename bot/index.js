@@ -918,11 +918,5 @@ ${statusEmojis[order.status] || '📦'} <b>Завершённый</b>
   console.log('🤖 Бот запущен!');
 }
 
-// Команда для заполнения базы данных
-if (process.argv[2] === 'seed') {
-  const seedScript = require('../seed.js');
-  return;
-}
-
 start().catch(console.error);
 module.exports = app;
