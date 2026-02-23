@@ -32,18 +32,17 @@ async function loadCategories() {
   try {
     const response = await fetch('/api/categories');
     categories = await response.json();
-    renderCategories();
+    if (categories.length === 0) throw new Error('Нет категорий');
   } catch (error) {
     console.error('Ошибка загрузки категорий:', error);
-    // Демо-категории если API недоступно
     categories = [
-      { id: 1, name: '💧 Жидкости', icon: '💧' },
-      { id: 2, name: '🔥 Поды', icon: '🔥' },
-      { id: 3, name: '🔧 Расходники', icon: '🔧' },
-      { id: 4, name: '🎁 Наборы', icon: '🎁' }
+      { id: 1, name: '💧 Жидкости' },
+      { id: 2, name: '🔥 Поды' },
+      { id: 3, name: '🔧 Расходники' },
+      { id: 4, name: '🎁 Наборы' }
     ];
-    renderCategories();
   }
+  renderCategories();
 }
 
 async function loadProducts(categoryId = null) {
@@ -54,102 +53,37 @@ async function loadProducts(categoryId = null) {
       : '/api/products';
     const response = await fetch(url);
     products = await response.json();
-    renderProducts();
   } catch (error) {
     console.error('Ошибка загрузки товаров:', error);
-    // Демо-товары если API недоступно
     products = getDemoProducts();
-    renderProducts();
   }
   hideLoader();
+  renderProducts();
 }
 
 function getDemoProducts() {
   return [
-    {
-      id: 1,
-      category_id: 1,
-      name: 'Husky Double Ice',
-      description: 'Ледяной манго-маракуйя с двойной концентрацией',
-      price: 450,
-      image_url: '',
-      stock: 50
-    },
-    {
-      id: 2,
-      category_id: 1,
-      name: 'Brusko Berry',
-      description: 'Смесь лесных ягод с прохладой',
-      price: 390,
-      image_url: '',
-      stock: 30
-    },
-    {
-      id: 3,
-      category_id: 2,
-      name: 'Vaporesso XROS 3',
-      description: 'Компактный под-система с отличным вкусом',
-      price: 2490,
-      image_url: '',
-      stock: 15
-    },
-    {
-      id: 4,
-      category_id: 2,
-      name: 'Voopoo V.Thru',
-      description: 'Стильный POD с керамическим испарителем',
-      price: 1990,
-      image_url: '',
-      stock: 20
-    },
-    {
-      id: 5,
-      category_id: 3,
-      name: 'Испарители XROS 0.6Ω',
-      description: 'Комплект из 4 испарителей (упаковка)',
-      price: 890,
-      image_url: '',
-      stock: 100
-    },
-    {
-      id: 6,
-      category_id: 3,
-      name: 'Картриджи V.Thru',
-      description: 'Комплект из 3 картриджей',
-      price: 650,
-      image_url: '',
-      stock: 80
-    },
-    {
-      id: 7,
-      category_id: 4,
-      name: 'Стартовый набор',
-      description: 'Vaporesso XROS 3 + 2 жидкости в подарок',
-      price: 2990,
-      image_url: '',
-      stock: 10
-    },
-    {
-      id: 8,
-      category_id: 1,
-      name: 'SALTIC Lemon',
-      description: 'Свежий лимон с мятой и льдом',
-      price: 420,
-      image_url: '',
-      stock: 45
-    }
+    { id: 1, category_id: 1, name: 'Husky Double Ice', description: 'Ледяной манго-маракуйя', price: 450, stock: 50 },
+    { id: 2, category_id: 1, name: 'Brusko Berry', description: 'Смесь лесных ягод с прохладой', price: 390, stock: 30 },
+    { id: 3, category_id: 1, name: 'SALTIC Lemon', description: 'Свежий лимон с мятой и льдом', price: 420, stock: 45 },
+    { id: 4, category_id: 2, name: 'Vaporesso XROS 3', description: 'Компактный под-система', price: 2490, stock: 15 },
+    { id: 5, category_id: 2, name: 'Voopoo V.Thru', description: 'Стильный POD с керамикой', price: 1990, stock: 20 },
+    { id: 6, category_id: 3, name: 'Испарители XROS 0.6Ω', description: 'Комплект из 4 шт', price: 890, stock: 100 },
+    { id: 7, category_id: 3, name: 'Картриджи V.Thru', description: 'Комплект из 3 шт', price: 650, stock: 80 },
+    { id: 8, category_id: 4, name: 'Стартовый набор', description: 'XROS 3 + 2 жидкости', price: 2990, stock: 10 }
   ];
 }
 
 // === РЕНДЕРИНГ ===
 
 function renderCategories() {
+  categoriesEl.innerHTML = '';
+  
   const allBtn = document.createElement('button');
   allBtn.className = 'category-btn active';
   allBtn.textContent = 'Все';
   allBtn.dataset.category = 'all';
   allBtn.addEventListener('click', () => selectCategory('all'));
-  categoriesEl.innerHTML = '';
   categoriesEl.appendChild(allBtn);
   
   categories.forEach(cat => {
@@ -167,7 +101,7 @@ function renderProducts() {
     productsGrid.innerHTML = `
       <div class="empty-state">
         <div class="empty-state-icon">📭</div>
-        <div class="empty-state-text">В этой категории пока нет товаров</div>
+        <div class="empty-state-text">В этой категории<br>пока нет товаров</div>
       </div>
     `;
     return;
@@ -175,16 +109,15 @@ function renderProducts() {
   
   productsGrid.innerHTML = products.map(product => `
     <div class="product-card" data-id="${product.id}">
-      <div class="product-image">
-        ${getProductEmoji(product)}
-      </div>
+      <div class="product-image">${getProductEmoji(product)}</div>
       <div class="product-info">
         <h3 class="product-name">${escapeHtml(product.name)}</h3>
         <p class="product-description">${escapeHtml(product.description)}</p>
         <div class="product-footer">
           <span class="product-price">${formatPrice(product.price)}</span>
           <button class="add-to-cart-btn" onclick="addToCart(${product.id})">
-            <span>➕</span> В корзину
+            <span class="add-icon">➕</span>
+            <span>В корзину</span>
           </button>
         </div>
       </div>
@@ -193,21 +126,16 @@ function renderProducts() {
 }
 
 function getProductEmoji(product) {
-  const emojis = {
-    1: '💧', // Жидкости
-    2: '🔥', // Поды
-    3: '🔧', // Расходники
-    4: '🎁'  // Наборы
-  };
+  const emojis = { 1: '💧', 2: '🔥', 3: '🔧', 4: '🎁' };
   return emojis[product.category_id] || '📦';
 }
 
 function renderCart() {
   if (cart.length === 0) {
     cartItems.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-state-icon">🛒</div>
-        <div class="empty-state-text">Корзина пуста</div>
+      <div class="empty-cart">
+        <div class="empty-icon">🛒</div>
+        <p>Корзина пуста</p>
       </div>
     `;
     totalPrice.textContent = '0 ₽';
@@ -235,6 +163,8 @@ function renderCart() {
 }
 
 function renderOrderSummary() {
+  const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  
   orderSummary.innerHTML = cart.map(item => `
     <div class="order-item">
       <span>${escapeHtml(item.name)} x${item.quantity}</span>
@@ -242,7 +172,6 @@ function renderOrderSummary() {
     </div>
   `).join('');
   
-  const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   totalAmount.textContent = formatPrice(total);
 }
 
@@ -279,16 +208,10 @@ function addToCart(productId) {
   renderCart();
   showToast('✅ Добавлено в корзину', 'success');
   
-  // Анимация кнопки корзины
   cartBtn.style.transform = 'scale(1.2)';
-  setTimeout(() => {
-    cartBtn.style.transform = 'scale(1)';
-  }, 200);
+  setTimeout(() => cartBtn.style.transform = 'scale(1)', 200);
   
-  // Haptic feedback
-  if (tg.HapticFeedback) {
-    tg.HapticFeedback.impactOccurred('light');
-  }
+  if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
 }
 
 function updateQty(productId, delta) {
@@ -303,9 +226,7 @@ function updateQty(productId, delta) {
   
   renderCart();
   
-  if (tg.HapticFeedback) {
-    tg.HapticFeedback.impactOccurred('light');
-  }
+  if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
 }
 
 function updateCartCount() {
@@ -317,6 +238,7 @@ function updateCartCount() {
 function openCart() {
   renderCart();
   cartModal.classList.add('active');
+  if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
 }
 
 function closeCartModal() {
@@ -385,17 +307,14 @@ async function submitOrder(e) {
       updateCartCount();
       showToast('✅ Заказ оформлен!', 'success');
       
-      // Закрыть Mini App через небольшую задержку
-      setTimeout(() => {
-        tg.close();
-      }, 1500);
+      setTimeout(() => tg.close(), 1500);
     } else {
       throw new Error('Ошибка при создании заказа');
     }
   } catch (error) {
     console.error('Ошибка:', error);
     hideLoader();
-    showToast('❌ Ошибка оформления заказа', 'error');
+    showToast('❌ Ошибка оформления', 'error');
   }
 }
 
@@ -403,9 +322,7 @@ function showToast(message, type = '') {
   toast.textContent = message;
   toast.className = 'toast show ' + type;
   
-  setTimeout(() => {
-    toast.className = 'toast';
-  }, 3000);
+  setTimeout(() => toast.className = 'toast', 3000);
 }
 
 function showLoader() {
@@ -434,7 +351,6 @@ checkoutBtn.addEventListener('click', openCheckout);
 closeCheckout.addEventListener('click', closeCheckoutModal);
 checkoutForm.addEventListener('submit', submitOrder);
 
-// Закрытие по клику на overlay
 document.querySelectorAll('.modal-overlay').forEach(overlay => {
   overlay.addEventListener('click', () => {
     cartModal.classList.remove('active');
@@ -446,6 +362,10 @@ document.querySelectorAll('.modal-overlay').forEach(overlay => {
 loadCategories();
 loadProducts();
 
-// Настройка цветов темы
-document.documentElement.style.setProperty('--tg-theme-bg-color', tg.backgroundColor || '#1a1a2e');
-document.documentElement.style.setProperty('--tg-theme-text-color', tg.textColor || '#ffffff');
+// Настройка темы
+if (tg.themeParams) {
+  if (tg.themeParams.bg_color) document.documentElement.style.setProperty('--tg-theme-bg-color', tg.themeParams.bg_color);
+  if (tg.themeParams.text_color) document.documentElement.style.setProperty('--tg-theme-text-color', tg.themeParams.text_color);
+  if (tg.themeParams.button_color) document.documentElement.style.setProperty('--tg-theme-button-color', tg.themeParams.button_color);
+  if (tg.themeParams.secondary_bg_color) document.documentElement.style.setProperty('--tg-theme-secondary-bg-color', tg.themeParams.secondary_bg_color);
+}

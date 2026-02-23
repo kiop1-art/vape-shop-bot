@@ -7,7 +7,7 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -20,7 +20,11 @@
           <span class="logo-text">VapeShop</span>
         </div>
         <button class="cart-btn" id="cartBtn">
-          <span class="cart-icon">🛒</span>
+          <svg class="cart-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="9" cy="21" r="1"></circle>
+            <circle cx="20" cy="21" r="1"></circle>
+            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+          </svg>
           <span class="cart-count" id="cartCount">0</span>
         </button>
       </div>
@@ -33,7 +37,11 @@
 
     <!-- Products Grid -->
     <main class="products-grid" id="productsGrid">
-      <!-- Products will be loaded here -->
+      <div class="skeleton-loader">
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+      </div>
     </main>
 
     <!-- Cart Modal -->
@@ -42,10 +50,18 @@
       <div class="modal-content">
         <div class="modal-header">
           <h2>🛒 Корзина</h2>
-          <button class="modal-close" id="closeCart">&times;</button>
+          <button class="modal-close" id="closeCart">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
         </div>
         <div class="cart-items" id="cartItems">
-          <!-- Cart items will be here -->
+          <div class="empty-cart">
+            <div class="empty-icon">🛒</div>
+            <p>Корзина пуста</p>
+          </div>
         </div>
         <div class="cart-footer">
           <div class="cart-total">
@@ -64,20 +80,34 @@
       <div class="modal-overlay"></div>
       <div class="modal-content">
         <div class="modal-header">
-          <h2>📝 Оформление заказа</h2>
-          <button class="modal-close" id="closeCheckout">&times;</button>
+          <h2>📝 Оформление</h2>
+          <button class="modal-close" id="closeCheckout">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
         </div>
         <form class="checkout-form" id="checkoutForm">
           <div class="form-group">
-            <label for="contactInfo">📞 Контакты</label>
+            <label for="contactInfo">
+              <span class="label-icon">📞</span>
+              Контакты
+            </label>
             <input type="text" id="contactInfo" placeholder="@username или телефон" required>
           </div>
           <div class="form-group">
-            <label for="deliveryAddress">📍 Адрес доставки</label>
+            <label for="deliveryAddress">
+              <span class="label-icon">📍</span>
+              Адрес доставки
+            </label>
             <textarea id="deliveryAddress" placeholder="Город, улица, дом, квартира" rows="3"></textarea>
           </div>
           <div class="form-group">
-            <label for="comment">💬 Комментарий</label>
+            <label for="comment">
+              <span class="label-icon">💬</span>
+              Комментарий
+            </label>
             <textarea id="comment" placeholder="Пожелания к заказу" rows="2"></textarea>
           </div>
           <div class="order-summary">
@@ -89,7 +119,10 @@
             <span class="total-amount" id="totalAmount">0 ₽</span>
           </div>
           <button type="submit" class="confirm-btn">
-            ✅ Подтвердить заказ
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            Подтвердить заказ
           </button>
         </form>
       </div>
