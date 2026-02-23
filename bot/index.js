@@ -17,10 +17,8 @@ let bot;
 let app;
 let WEB_APP_URL = process.env.WEB_APP_URL || 'http://localhost:3001';
 
-// Хранилище состояний админки
 const adminState = {};
 
-// Настройка multer
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const uploadDir = path.join(__dirname, '../uploads');
@@ -41,6 +39,15 @@ const upload = multer({
   }
 });
 
+// HTML escaping
+function escapeHtml(text) {
+  if (!text) return '';
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 async function start() {
   await db.initDatabase();
   console.log('✅ База данных инициализирована');
@@ -52,8 +59,6 @@ async function start() {
   app.use(express.static(path.join(__dirname, '../webapp')));
   app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
-  // === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
-  
   function registerUser(userId, username, firstName, lastName) {
     try {
       const existing = db.prepare('SELECT id FROM users WHERE telegram_id = ?').get(userId);
@@ -76,46 +81,13 @@ async function start() {
     }
   }
 
-  function escapeMarkdown(text) {
-    if (!text) return '';
-    // Экранируем специальные символы Markdown v1
-    return String(text)
-      .replace(/\\/g, '\\\\')
-      .replace(/_/g, '\\_')
-      .replace(/\*/g, '\\*')
-      .replace(/\[/g, '\\[')
-      .replace(/]/g, '\\]')
-      .replace(/\(/g, '\\(')
-      .replace(/\)/g, '\\)')
-      .replace(/~/g, '\\~')
-      .replace(/`/g, '\\`')
-      .replace(/>/g, '\\>')
-      .replace(/#/g, '\\#')
-      .replace(/\+/g, '\\+')
-      .replace(/-/g, '\\-')
-      .replace(/=/g, '\\=')
-      .replace(/\|/g, '\\|')
-      .replace(/\{/g, '\\{')
-      .replace(/\}/g, '\\}')
-      .replace(/\./g, '\\.')
-      .replace(/!/g, '\\!')
-      .replace(/&/g, '\\&');
-  }
-  
-  function isAdmin(userId) { 
-    return adminIds.includes(parseInt(userId)); 
-  }
-  
-  function formatPrice(price) { 
-    return `${price.toLocaleString('ru-RU')} ₽`; 
-  }
-  
+  function isAdmin(userId) { return adminIds.includes(parseInt(userId)); }
+  function formatPrice(price) { return `${price.toLocaleString('ru-RU')} ₽`; }
   function getStatusEmoji(status) {
     const emojis = { pending: '⏳', confirmed: '✅', shipping: '🚀', completed: '✨', cancelled: '❌' };
     return emojis[status] || '📦';
   }
 
-  // === ПРОВЕРКА ПОДПИСКИ ===
   async function handleStart(msg, checkSub = true) {
     const chatId = msg.chat.id;
     registerUser(chatId, msg.from.username, msg.from.first_name, msg.from.last_name);
@@ -123,52 +95,48 @@ async function start() {
     if (checkSub) {
       const isSubscribed = await checkSubscription(chatId);
       if (!isSubscribed) {
-        bot.sendMessage(chatId, `⚠️ **Для использования бота необходимо подписаться на наш канал!**
+        bot.sendMessage(chatId, `⚠️ <b>Для использования бота необходимо подписаться на наш канал!</b>
 
-📢 Присоединяйтесь к ${CHANNEL_ID}
+📢 Присоединяйтесь к ${escapeHtml(CHANNEL_ID)}
 
 После подписки нажмите кнопку ниже:`, {
           reply_markup: {
             inline_keyboard: [[{ text: '✅ Я подписался', callback_data: 'check_subscription' }]]
           },
-          parse_mode: 'Markdown'
+          parse_mode: 'HTML'
         });
         return;
       }
     }
     
-    bot.sendMessage(chatId, `👋 Привет, ${msg.from.first_name}!
+    bot.sendMessage(chatId, `👋 Привет, ${escapeHtml(msg.from.first_name)}!
 
-🛍️ **VapeShop** — твой магазин
+🛍️ <b>VapeShop</b> — твой магазин
 
 📱 Нажми кнопку ниже:`, {
       reply_markup: {
         inline_keyboard: [[{ text: '🛒 Открыть каталог', web_app: { url: WEB_APP_URL } }]]
       },
-      parse_mode: 'Markdown'
+      parse_mode: 'HTML'
     });
     
     if (isAdmin(chatId)) {
       setTimeout(() => {
-        bot.sendMessage(chatId, '🔑 **Админ-панель**\n\nВыберите раздел:', {
+        bot.sendMessage(chatId, '🔑 <b>Админ-панель</b>\n\nВыберите раздел:', {
           reply_markup: keyboards.adminKeyboard,
-          parse_mode: 'Markdown'
+          parse_mode: 'HTML'
         });
       }, 500);
     }
   }
 
-  // === БОТ ===
-
   bot.onText(/\/start/, (msg) => handleStart(msg, true));
 
-  // Callback query
   bot.on('callback_query', async (query) => {
     const chatId = query.message.chat.id;
     const data = query.data;
     const messageId = query.message.message_id;
 
-    // Проверка подписки
     if (data === 'check_subscription') {
       const isSubscribed = await checkSubscription(chatId);
       if (isSubscribed) {
@@ -183,13 +151,11 @@ async function start() {
       return;
     }
 
-    // Админ только
     if (!isAdmin(chatId)) {
       bot.answerCallbackQuery(query.id, { text: '❌ Доступ запрещён', show_alert: true });
       return;
     }
 
-    // Статусы заказов
     if (data.startsWith('confirm_')) {
       const orderId = parseInt(data.split('_')[1]);
       db.prepare('UPDATE orders SET status = ? WHERE id = ?').run('confirmed', orderId);
@@ -254,7 +220,6 @@ async function start() {
       return;
     }
 
-    // Удаление новости
     if (data.startsWith('delete_news_')) {
       const newsId = parseInt(data.split('_')[2]);
       db.prepare('DELETE FROM news WHERE id = ?').run(newsId);
@@ -263,24 +228,21 @@ async function start() {
       return;
     }
 
-    // Назад в меню
     if (data === 'back_admin') {
       bot.deleteMessage(chatId, messageId).catch(() => {});
-      bot.sendMessage(chatId, '🔑 **Админ-панель**\n\nВыберите раздел:', {
+      bot.sendMessage(chatId, '🔑 <b>Админ-панель</b>\n\nВыберите раздел:', {
         reply_markup: keyboards.adminKeyboard,
-        parse_mode: 'Markdown'
+        parse_mode: 'HTML'
       });
       return;
     }
 
-    // Добавить ещё товар
     if (data === 'add_another_product') {
       bot.deleteMessage(chatId, messageId);
       startAddProduct(chatId);
       return;
     }
 
-    // Обновить новости
     if (data === 'refresh_news') {
       bot.answerCallbackQuery(query.id, { text: '🔄 Обновлено' });
       bot.deleteMessage(chatId, messageId).catch(() => {});
@@ -288,7 +250,6 @@ async function start() {
       return;
     }
 
-    // Обновить промокоды
     if (data === 'refresh_promocodes') {
       bot.answerCallbackQuery(query.id, { text: '🔄 Обновлено' });
       bot.deleteMessage(chatId, messageId).catch(() => {});
@@ -296,7 +257,6 @@ async function start() {
       return;
     }
 
-    // Обновить пользователей
     if (data === 'refresh_users') {
       bot.answerCallbackQuery(query.id, { text: '🔄 Обновлено' });
       bot.deleteMessage(chatId, messageId).catch(() => {});
@@ -305,12 +265,10 @@ async function start() {
     }
   });
 
-  // === КОМАНДЫ МЕНЮ ===
-
   bot.onText(/🛒 Каталог/, async (msg) => {
     const isSubscribed = await checkSubscription(msg.chat.id);
     if (!isSubscribed) {
-      bot.sendMessage(msg.chat.id, `⚠️ Сначала подпишитесь на канал: ${CHANNEL_ID}`, {
+      bot.sendMessage(msg.chat.id, `⚠️ Сначала подпишитесь на канал: ${escapeHtml(CHANNEL_ID)}`, {
         reply_markup: { inline_keyboard: [[{ text: '✅ Я подписался', callback_data: 'check_subscription' }]] }
       });
       return;
@@ -335,24 +293,24 @@ async function start() {
     const ordersCount = db.prepare('SELECT COUNT(*) as count FROM orders WHERE user_id = ?').get(user.id).count;
     const totalSpent = db.prepare('SELECT COALESCE(SUM(total_amount), 0) as total FROM orders WHERE user_id = ? AND status != \'cancelled\'').get(user.id).total;
     
-    bot.sendMessage(msg.chat.id, `👤 **Профиль**
+    bot.sendMessage(msg.chat.id, `👤 <b>Профиль</b>
 
-📛 ${user.first_name} ${user.last_name || ''}
-🆔 \`${user.telegram_id}\`
+📛 ${escapeHtml(user.first_name)} ${escapeHtml(user.last_name) || ''}
+🆔 <code>${user.telegram_id}</code>
 📅 ${new Date(user.created_at).toLocaleDateString('ru-RU')}
 
 📦 Заказов: ${ordersCount}
 💰 Потрачено: ${formatPrice(totalSpent)}`, {
-      parse_mode: 'Markdown'
+      parse_mode: 'HTML'
     });
   });
 
   bot.onText(/📞 Поддержка/, (msg) => {
-    bot.sendMessage(msg.chat.id, `📞 **Поддержка**
+    bot.sendMessage(msg.chat.id, `📞 <b>Поддержка</b>
 
 💬 @vapeshop_support
 ⏰ 10:00 - 22:00 МСК`, {
-      parse_mode: 'Markdown'
+      parse_mode: 'HTML'
     });
   });
 
@@ -368,8 +326,8 @@ async function start() {
     
     orders.forEach(order => {
       const items = db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(order.id);
-      const itemsText = items.map(i => `• ${i.product_name} x${i.quantity} — ${formatPrice(i.price * i.quantity)}`).join('\n');
-      bot.sendMessage(msg.chat.id, `📦 **Заказ #${order.order_uuid.substring(0, 8)}**
+      const itemsText = items.map(i => `• ${escapeHtml(i.product_name)} x${i.quantity} — ${formatPrice(i.price * i.quantity)}`).join('\n');
+      bot.sendMessage(msg.chat.id, `📦 <b>Заказ #${order.order_uuid.substring(0, 8)}</b>
 
 💰 ${formatPrice(order.total_amount)}
 📊 ${getStatusEmoji(order.status)} ${order.status}
@@ -377,18 +335,16 @@ async function start() {
 
 🛒 Товары:
 ${itemsText}`, {
-        parse_mode: 'Markdown'
+        parse_mode: 'HTML'
       });
     });
   });
 
-  // === АДМИН ПАНЕЛЬ ===
-
   bot.onText(/🔑 Админ-панель/, (msg) => {
     if (!isAdmin(msg.chat.id)) return;
-    bot.sendMessage(msg.chat.id, '🔑 **Админ-панель**\n\nВыберите раздел:', {
+    bot.sendMessage(msg.chat.id, '🔑 <b>Админ-панель</b>\n\nВыберите раздел:', {
       reply_markup: keyboards.adminKeyboard,
-      parse_mode: 'Markdown'
+      parse_mode: 'HTML'
     });
   });
 
@@ -399,13 +355,13 @@ ${itemsText}`, {
     const totalOrders = db.prepare('SELECT COUNT(*) as count FROM orders').get().count;
     const revenue = db.prepare('SELECT COALESCE(SUM(total_amount), 0) as total FROM orders WHERE status != \'cancelled\'').get().total;
     
-    bot.sendMessage(msg.chat.id, `📊 **Статистика**
+    bot.sendMessage(msg.chat.id, `📊 <b>Статистика</b>
 
 👥 ${totalUsers}
 🛍️ ${totalProducts}
 📦 ${totalOrders}
 💰 ${formatPrice(revenue)}`, {
-      parse_mode: 'Markdown'
+      parse_mode: 'HTML'
     });
   });
 
@@ -418,16 +374,15 @@ ${itemsText}`, {
     }
     orders.forEach(order => {
       const items = db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(order.id);
-      const itemsText = items.map(i => `• ${escapeMarkdown(i.product_name)} x${i.quantity} — ${formatPrice(i.price * i.quantity)}`).join('\n');
-      const name = escapeMarkdown([order.first_name, order.last_name].filter(Boolean).join(' ') || 'Без имени');
+      const itemsText = items.map(i => `• ${escapeHtml(i.product_name)} x${i.quantity} — ${formatPrice(i.price * i.quantity)}`).join('\n');
       bot.sendMessage(msg.chat.id, `📦 #${order.order_uuid.substring(0, 8)}
 
-👤 ${name} (\`${order.telegram_id}\`)
+👤 ${escapeHtml(order.first_name)} (<code>${order.telegram_id}</code>)
 💰 ${formatPrice(order.total_amount)}
 📊 ${getStatusEmoji(order.status)} ${order.status}
 
 🛒 ${itemsText}`, {
-        parse_mode: 'Markdown',
+        parse_mode: 'HTML',
         reply_markup: keyboards.orderStatusKeyboard(order.id, order.status)
       });
     });
@@ -435,9 +390,9 @@ ${itemsText}`, {
 
   bot.onText(/🛍️ Товары/, (msg) => {
     if (!isAdmin(msg.chat.id)) return;
-    bot.sendMessage(msg.chat.id, '🛍️ **Управление товарами**', {
+    bot.sendMessage(msg.chat.id, '🛍️ <b>Управление товарами</b>', {
       reply_markup: keyboards.productsAdminKeyboard,
-      parse_mode: 'Markdown'
+      parse_mode: 'HTML'
     });
   });
 
@@ -448,24 +403,23 @@ ${itemsText}`, {
 
   bot.onText(/🔙 В меню/, (msg) => {
     if (!isAdmin(msg.chat.id)) return;
-    bot.sendMessage(msg.chat.id, '🔑 **Админ-панель**\n\nВыберите раздел:', {
+    bot.sendMessage(msg.chat.id, '🔑 <b>Админ-панель</b>\n\nВыберите раздел:', {
       reply_markup: keyboards.adminKeyboard,
-      parse_mode: 'Markdown'
+      parse_mode: 'HTML'
     });
   });
 
   bot.onText(/🔙 Назад/, (msg) => {
-    bot.sendMessage(msg.chat.id, '📂 **Меню**', {
-      reply_markup: keyboards.mainKeyboard
+    bot.sendMessage(msg.chat.id, '📂 <b>Меню</b>', {
+      reply_markup: keyboards.mainKeyboard,
+      parse_mode: 'HTML'
     });
   });
 
-  // === ДОБАВЛЕНИЕ ТОВАРА ===
-
   function startAddProduct(chatId) {
     adminState[chatId] = { step: 0, type: 'product' };
-    bot.sendMessage(chatId, '📝 **Добавление товара**\n\n*Шаг 1/5:* Отправьте **название** товара:', {
-      parse_mode: 'Markdown',
+    bot.sendMessage(chatId, '📝 <b>Добавление товара</b>\n\n<b>Шаг 1/5:</b> Отправьте <b>название</b> товара:', {
+      parse_mode: 'HTML',
       reply_markup: { keyboard: [['❌ Отмена']], resize_keyboard: true }
     });
   }
@@ -475,12 +429,10 @@ ${itemsText}`, {
     startAddProduct(msg.chat.id);
   });
 
-  // === ДОБАВЛЕНИЕ НОВОСТИ ===
-
   function startAddNews(chatId) {
     adminState[chatId] = { step: 0, type: 'news' };
-    bot.sendMessage(chatId, '📝 **Добавление новости**\n\n*Шаг 1/3:* Отправьте **заголовок**:', {
-      parse_mode: 'Markdown',
+    bot.sendMessage(chatId, '📝 <b>Добавление новости</b>\n\n<b>Шаг 1/3:</b> Отправьте <b>заголовок</b>:', {
+      parse_mode: 'HTML',
       reply_markup: { keyboard: [['❌ Отмена']], resize_keyboard: true }
     });
   }
@@ -497,29 +449,23 @@ ${itemsText}`, {
       return;
     }
     news.forEach(n => {
-      bot.sendMessage(chatId, `📰 *${escapeMarkdown(n.title)}*
-
-${escapeMarkdown(n.content)}
-
-🕐 ${new Date(n.created_at).toLocaleString('ru-RU')}`, {
-        parse_mode: 'Markdown',
+      bot.sendMessage(chatId, `📰 <b>${escapeHtml(n.title)}</b>\n\n${escapeHtml(n.content)}\n\n🕐 ${new Date(n.created_at).toLocaleString('ru-RU')}`, {
+        parse_mode: 'HTML',
         reply_markup: {
           inline_keyboard: [[{ text: '🗑️ Удалить', callback_data: `delete_news_${n.id}` }]]
         }
       });
     });
-    bot.sendMessage(chatId, '📰 **Новости**', {
+    bot.sendMessage(chatId, '📰 <b>Новости</b>', {
       reply_markup: { inline_keyboard: [[{ text: '🔄 Обновить', callback_data: 'refresh_news' }]] },
-      parse_mode: 'Markdown'
+      parse_mode: 'HTML'
     });
   }
 
-  // === ПРОМОКОДЫ ===
-
   function startAddPromocode(chatId) {
     adminState[chatId] = { step: 0, type: 'promocode' };
-    bot.sendMessage(chatId, '🎁 **Создание промокода**\n\n*Шаг 1/3:* Отправьте **код** (латиницей, без пробелов):', {
-      parse_mode: 'Markdown',
+    bot.sendMessage(chatId, '🎁 <b>Создание промокода</b>\n\n<b>Шаг 1/3:</b> Отправьте <b>код</b> (латиницей, без пробелов):', {
+      parse_mode: 'HTML',
       reply_markup: { keyboard: [['❌ Отмена']], resize_keyboard: true }
     });
   }
@@ -540,15 +486,15 @@ ${escapeMarkdown(n.content)}
       bot.sendMessage(chatId, '🎭 Промокодов пока нет');
       return;
     }
-    let message = '🎁 **Промокоды**\n\n';
+    let message = '🎁 <b>Промокоды</b>\n\n';
     promocodes.forEach(p => {
       const isActive = p.is_active ? '✅' : '❌';
       const uses = p.max_uses ? `${p.uses_count}/${p.max_uses}` : `${p.uses_count}/∞`;
-      message += `${isActive} \`${p.code}\` — ${p.discount}%\n`;
+      message += `${isActive} <code>${escapeHtml(p.code)}</code> — ${p.discount}%\n`;
       message += `   Использован: ${uses}\n\n`;
     });
     bot.sendMessage(chatId, message, {
-      parse_mode: 'Markdown',
+      parse_mode: 'HTML',
       reply_markup: { inline_keyboard: [[{ text: '🔄 Обновить', callback_data: 'refresh_promocodes' }]] }
     });
   }
@@ -563,22 +509,20 @@ ${escapeMarkdown(n.content)}
       bot.sendMessage(chatId, '📭 Пользователей нет');
       return;
     }
-    let message = '👥 **Пользователи**\n\n';
+    let message = '👥 <b>Пользователи</b>\n\n';
     users.forEach((u, i) => {
       const name = [u.first_name, u.last_name].filter(Boolean).join(' ') || 'Без имени';
-      const username = u.username ? `@${u.username}` : '—';
-      message += `${i + 1}. **${name}**\n`;
+      const username = u.username ? `@${escapeHtml(u.username)}` : '—';
+      message += `${i + 1}. <b>${escapeHtml(name)}</b>\n`;
       message += `   Username: ${username}\n`;
-      message += `   ID: \`${u.telegram_id}\`\n`;
+      message += `   ID: <code>${u.telegram_id}</code>\n`;
       message += `   📦 ${u.order_count} заказов | 💰 ${formatPrice(u.total_spent)}\n\n`;
     });
     bot.sendMessage(chatId, message, {
-      parse_mode: 'Markdown',
+      parse_mode: 'HTML',
       reply_markup: { inline_keyboard: [[{ text: '🔄 Обновить', callback_data: 'refresh_users' }]] }
     });
   }
-
-  // === ОТМЕНА ===
 
   bot.onText(/❌ Отмена/, (msg) => {
     delete adminState[msg.chat.id];
@@ -587,12 +531,8 @@ ${escapeMarkdown(n.content)}
     });
   });
 
-  // === ОБРАБОТКА СОСТОЯНИЙ ===
-
   bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
-    
-    // Игнорируем не-админов и текстовые команды
     if (!isAdmin(chatId)) return;
     if (!adminState[chatId]) return;
     
@@ -606,27 +546,22 @@ ${escapeMarkdown(n.content)}
 
     // ===== ДОБАВЛЕНИЕ ТОВАРА =====
     if (state.type === 'product') {
-      // Шаг 0: Название
       if (state.step === 0) {
         state.name = text;
         state.step = 1;
-        bot.sendMessage(chatId, '✅ Название сохранено.\n\n*Шаг 2/5:* Отправьте **описание**:', {
-          parse_mode: 'Markdown'
+        bot.sendMessage(chatId, '✅ Название сохранено.\n\n<b>Шаг 2/5:</b> Отправьте <b>описание</b>:', {
+          parse_mode: 'HTML'
         });
         return;
       }
-      
-      // Шаг 1: Описание
       if (state.step === 1) {
         state.description = text;
         state.step = 2;
-        bot.sendMessage(chatId, '✅ Описание сохранено.\n\n*Шаг 3/5:* Отправьте **цену** (число в рублях):', {
-          parse_mode: 'Markdown'
+        bot.sendMessage(chatId, '✅ Описание сохранено.\n\n<b>Шаг 3/5:</b> Отправьте <b>цену</b> (число в рублях):', {
+          parse_mode: 'HTML'
         });
         return;
       }
-      
-      // Шаг 2: Цена
       if (state.step === 2) {
         const price = parseInt(text);
         if (isNaN(price) || price <= 0) {
@@ -635,13 +570,11 @@ ${escapeMarkdown(n.content)}
         }
         state.price = price;
         state.step = 3;
-        bot.sendMessage(chatId, '✅ Цена сохранена.\n\n*Шаг 4/5:* Отправьте **ID категории**:\n\n1 — 💧 Жидкости\n2 — 🔥 Поды\n3 — 🔧 Расходники\n4 — 🎁 Наборы', {
-          parse_mode: 'Markdown'
+        bot.sendMessage(chatId, '✅ Цена сохранена.\n\n<b>Шаг 4/5:</b> Отправьте <b>ID категории</b>:\n\n1 — 💧 Жидкости\n2 — 🔥 Поды\n3 — 🔧 Расходники\n4 — 🎁 Наборы', {
+          parse_mode: 'HTML'
         });
         return;
       }
-      
-      // Шаг 3: Категория
       if (state.step === 3) {
         const categoryId = parseInt(text);
         if (![1, 2, 3, 4].includes(categoryId)) {
@@ -650,13 +583,11 @@ ${escapeMarkdown(n.content)}
         }
         state.category_id = categoryId;
         state.step = 4;
-        bot.sendMessage(chatId, '✅ Категория сохранена.\n\n*Шаг 5/5:* Отправьте **фото** товара или напишите "пропустить":', {
-          parse_mode: 'Markdown'
+        bot.sendMessage(chatId, '✅ Категория сохранена.\n\n<b>Шаг 5/5:</b> Отправьте <b>фото</b> товара или напишите "пропустить":', {
+          parse_mode: 'HTML'
         });
         return;
       }
-      
-      // Шаг 4: Фото
       if (state.step === 4) {
         if (text && text.toLowerCase() === 'пропустить') {
           state.image_url = null;
@@ -671,8 +602,6 @@ ${escapeMarkdown(n.content)}
           return;
         }
       }
-      
-      // Шаг 6: Сохранение
       if (state.step === 6) {
         try {
           db.prepare(`
@@ -682,13 +611,13 @@ ${escapeMarkdown(n.content)}
           
           const category = db.prepare('SELECT name FROM categories WHERE id = ?').get(state.category_id);
           
-          bot.sendMessage(chatId, `✅ **Товар добавлен!**
+          bot.sendMessage(chatId, `✅ <b>Товар добавлен!</b>
 
-📦 ${escapeMarkdown(state.name)}
+📦 ${escapeHtml(state.name)}
 💰 ${formatPrice(state.price)}
 📂 ${category?.name || '—'}
 ${state.image_url ? '🖼️ Фото: загружено' : '🖼️ Фото: нет'}`, {
-            parse_mode: 'Markdown',
+            parse_mode: 'HTML',
             reply_markup: {
               inline_keyboard: [
                 [{ text: '➕ Добавить ещё', callback_data: 'add_another_product' }],
@@ -697,7 +626,7 @@ ${state.image_url ? '🖼️ Фото: загружено' : '🖼️ Фото: 
             }
           });
         } catch (e) {
-          bot.sendMessage(chatId, `❌ Ошибка: ${e.message}`);
+          bot.sendMessage(chatId, `❌ Ошибка: ${escapeHtml(e.message)}`);
         }
         delete adminState[chatId];
         return;
@@ -706,27 +635,22 @@ ${state.image_url ? '🖼️ Фото: загружено' : '🖼️ Фото: 
 
     // ===== ДОБАВЛЕНИЕ НОВОСТИ =====
     if (state.type === 'news') {
-      // Шаг 0: Заголовок
       if (state.step === 0) {
         state.title = text;
         state.step = 1;
-        bot.sendMessage(chatId, '✅ Заголовок сохранён.\n\n*Шаг 2/3:* Отправьте **текст новости**:', {
-          parse_mode: 'Markdown'
+        bot.sendMessage(chatId, '✅ Заголовок сохранён.\n\n<b>Шаг 2/3:</b> Отправьте <b>текст новости</b>:', {
+          parse_mode: 'HTML'
         });
         return;
       }
-      
-      // Шаг 1: Текст
       if (state.step === 1) {
         state.content = text;
         state.step = 2;
-        bot.sendMessage(chatId, '✅ Текст сохранён.\n\n*Шаг 3/3:* Отправьте **фото** или напишите "пропустить":', {
-          parse_mode: 'Markdown'
+        bot.sendMessage(chatId, '✅ Текст сохранён.\n\n<b>Шаг 3/3:</b> Отправьте <b>фото</b> или напишите "пропустить":', {
+          parse_mode: 'HTML'
         });
         return;
       }
-      
-      // Шаг 2: Фото
       if (state.step === 2) {
         if (text && text.toLowerCase() === 'пропустить') {
           state.image_url = null;
@@ -741,24 +665,22 @@ ${state.image_url ? '🖼️ Фото: загружено' : '🖼️ Фото: 
           return;
         }
       }
-      
-      // Шаг 4: Сохранение
       if (state.step === 4) {
         try {
           db.prepare(`INSERT INTO news (title, content, image_url) VALUES (?, ?, ?)`).run(
             state.title, state.content, state.image_url
           );
           
-          bot.sendMessage(chatId, `✅ **Новость добавлена!**
+          bot.sendMessage(chatId, `✅ <b>Новость добавлена!</b>
 
-📰 ${escapeMarkdown(state.title)}`, {
-            parse_mode: 'Markdown',
+📰 ${escapeHtml(state.title)}`, {
+            parse_mode: 'HTML',
             reply_markup: {
               inline_keyboard: [[{ text: '🔙 В меню', callback_data: 'back_admin' }]]
             }
           });
         } catch (e) {
-          bot.sendMessage(chatId, `❌ Ошибка: ${e.message}`);
+          bot.sendMessage(chatId, `❌ Ошибка: ${escapeHtml(e.message)}`);
         }
         delete adminState[chatId];
         return;
@@ -767,7 +689,6 @@ ${state.image_url ? '🖼️ Фото: загружено' : '🖼️ Фото: 
 
     // ===== СОЗДАНИЕ ПРОМОКОДА =====
     if (state.type === 'promocode') {
-      // Шаг 0: Код
       if (state.step === 0) {
         const code = text.toUpperCase().replace(/[^A-Z0-9]/g, '');
         if (code.length < 3) {
@@ -776,13 +697,11 @@ ${state.image_url ? '🖼️ Фото: загружено' : '🖼️ Фото: 
         }
         state.code = code;
         state.step = 1;
-        bot.sendMessage(chatId, `✅ Код \`${code}\` сохранён.\n\n*Шаг 2/3:* Размер **скидки** в процентах (1-100):`, {
-          parse_mode: 'Markdown'
+        bot.sendMessage(chatId, `✅ Код <code>${code}</code> сохранён.\n\n<b>Шаг 2/3:</b> Размер <b>скидки</b> в процентах (1-100):`, {
+          parse_mode: 'HTML'
         });
         return;
       }
-      
-      // Шаг 1: Скидка
       if (state.step === 1) {
         const discount = parseInt(text);
         if (isNaN(discount) || discount < 1 || discount > 100) {
@@ -791,13 +710,11 @@ ${state.image_url ? '🖼️ Фото: загружено' : '🖼️ Фото: 
         }
         state.discount = discount;
         state.step = 2;
-        bot.sendMessage(chatId, `✅ Скидка ${discount}% сохранена.\n\n*Шаг 3/3:* Макс. **кол-во использований** (0 = безлимит):`, {
-          parse_mode: 'Markdown'
+        bot.sendMessage(chatId, `✅ Скидка ${discount}% сохранена.\n\n<b>Шаг 3/3:</b> Макс. <b>кол-во использований</b> (0 = безлимит):`, {
+          parse_mode: 'HTML'
         });
         return;
       }
-      
-      // Шаг 2: Лимит
       if (state.step === 2) {
         const maxUses = parseInt(text);
         if (isNaN(maxUses)) {
@@ -807,20 +724,18 @@ ${state.image_url ? '🖼️ Фото: загружено' : '🖼️ Фото: 
         state.max_uses = maxUses === 0 ? null : maxUses;
         state.step = 4;
       }
-      
-      // Шаг 4: Сохранение
       if (state.step === 4) {
         try {
           db.prepare(`INSERT INTO promocodes (code, discount, max_uses) VALUES (?, ?, ?)`).run(
             state.code, state.discount, state.max_uses
           );
           
-          bot.sendMessage(chatId, `✅ **Промокод создан!**
+          bot.sendMessage(chatId, `✅ <b>Промокод создан!</b>
 
-🎁 \`${state.code}\`
+🎁 <code>${state.code}</code>
 💰 Скидка: ${state.discount}%
 ${state.max_uses ? `🔢 Лимит: ${state.max_uses} раз` : '🔢 Безлимитный'}`, {
-            parse_mode: 'Markdown',
+            parse_mode: 'HTML',
             reply_markup: {
               inline_keyboard: [[{ text: '🔙 В меню', callback_data: 'back_admin' }]]
             }
@@ -831,7 +746,7 @@ ${state.max_uses ? `🔢 Лимит: ${state.max_uses} раз` : '🔢 Безл�
             state.step = 0;
             return;
           }
-          bot.sendMessage(chatId, `❌ Ошибка: ${e.message}`);
+          bot.sendMessage(chatId, `❌ Ошибка: ${escapeHtml(e.message)}`);
         }
         delete adminState[chatId];
         return;
@@ -897,24 +812,24 @@ ${state.max_uses ? `🔢 Лимит: ${state.max_uses} раз` : '🔢 Безл�
     items.forEach(item => itemStmt.run(orderId, item.product_id, item.name, item.quantity, item.price));
     
     adminIds.forEach(adminId => {
-      const itemsText = items.map(i => `• ${escapeMarkdown(i.name)} x${i.quantity} — ${formatPrice(i.price * i.quantity)}`).join('\n');
-      bot.sendMessage(adminId, `🔔 **Новый заказ!**
+      const itemsText = items.map(i => `• ${escapeHtml(i.name)} x${i.quantity} — ${formatPrice(i.price * i.quantity)}`).join('\n');
+      bot.sendMessage(adminId, `🔔 <b>Новый заказ!</b>
 
 📦 #${orderUuid.substring(0, 8)}
-👤 \`${userId}\`
+👤 ${userId}
 💰 ${formatPrice(totalAmount)}
-📍 ${escapeMarkdown(deliveryAddress) || '—'}
-📞 ${escapeMarkdown(contactInfo) || '—'}
-${promocode ? `🎁 Промокод: ${escapeMarkdown(promocode)}` : ''}
+📍 ${deliveryAddress || '—'}
+📞 ${contactInfo || '—'}
+${promocode ? `🎁 Промокод: ${promocode}` : ''}
 
 🛒 ${itemsText}`, {
-        parse_mode: 'Markdown',
+        parse_mode: 'HTML',
         reply_markup: keyboards.orderStatusKeyboard(orderId, 'pending')
       });
     });
-
-    bot.sendMessage(userId, `✅ **Заказ #${orderUuid.substring(0, 8)} принят!**`, {
-      parse_mode: 'Markdown'
+    
+    bot.sendMessage(userId, `✅ <b>Заказ #${orderUuid.substring(0, 8)} принят!</b>`, {
+      parse_mode: 'HTML'
     });
     
     res.json({ success: true, orderId: orderUuid });
