@@ -703,14 +703,25 @@ ${itemsText}
   });
 
   // === API ===
-  app.get('/api/categories', (req, res) => res.json(db.prepare('SELECT * FROM categories ORDER BY sort_order').all()));
+  app.get('/api/categories', (req, res) => {
+    const cats = db.prepare('SELECT * FROM categories ORDER BY sort_order').all();
+    console.log('API /api/categories:', cats);
+    res.json(cats);
+  });
+  
   app.get('/api/products', (req, res) => {
     const products = req.query.category_id 
       ? db.prepare('SELECT * FROM products WHERE category_id = ? AND is_active = 1').all(req.query.category_id)
       : db.prepare('SELECT * FROM products WHERE is_active = 1').all();
+    console.log('API /api/products:', products.length, 'категория:', req.query.category_id);
     res.json(products);
   });
-  app.get('/api/news', (req, res) => res.json(db.prepare('SELECT * FROM news ORDER BY created_at DESC LIMIT 20').all()));
+  
+  app.get('/api/news', (req, res) => {
+    const n = db.prepare('SELECT * FROM news ORDER BY created_at DESC LIMIT 20').all();
+    console.log('API /api/news:', n.length);
+    res.json(n);
+  });
   
   // API для заказов пользователя
   app.get('/api/orders', (req, res) => {
@@ -722,11 +733,11 @@ ${itemsText}
     
     const orders = db.prepare('SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC LIMIT 20').all(user.id);
     
-    // Добавляем товары к каждому заказу
     orders.forEach(order => {
       order.items = db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(order.id);
     });
     
+    console.log('API /api/orders:', orders.length, 'для userId:', userId);
     res.json(orders);
   });
   

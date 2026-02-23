@@ -36,13 +36,11 @@ const orderDetailModal = document.getElementById('orderDetailModal');
 const orderDetailId = document.getElementById('orderDetailId');
 const orderDetailBody = document.getElementById('orderDetailBody');
 
-// Tabs
 const tabBtns = document.querySelectorAll('.tab-btn');
 const shopTab = document.getElementById('shopTab');
 const ordersTab = document.getElementById('ordersTab');
 const newsTab = document.getElementById('newsTab');
 
-// Статусы заказов на русском
 const statusLabels = {
   'pending': { text: '⏳ На обработке', color: '#f59e0b' },
   'confirmed': { text: '✅ Подтверждён', color: '#10b981' },
@@ -51,17 +49,21 @@ const statusLabels = {
   'cancelled': { text: '❌ Отменён', color: '#ef4444' }
 };
 
-// Время для Екатеринбурга (UTC+5)
+// Время Екатеринбурга (UTC+5)
 function formatEkaterinburgTime(dateString) {
-  const date = new Date(dateString);
-  return date.toLocaleString('ru-RU', {
-    timeZone: 'Asia/Yekaterinburg',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleString('ru-RU', {
+      timeZone: 'Asia/Yekaterinburg',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch (e) {
+    return new Date(dateString).toLocaleString('ru-RU');
+  }
 }
 
 // === ЗАГРУЗКА ДАННЫХ ===
@@ -70,7 +72,9 @@ async function loadCategories() {
   try {
     const res = await fetch('/api/categories');
     categories = await res.json();
+    console.log('Категории:', categories);
   } catch (e) {
+    console.error('Ошибка загрузки категорий:', e);
     categories = [
       { id: 1, name: '💧 Жидкости' },
       { id: 2, name: '🔥 Поды' },
@@ -85,9 +89,12 @@ async function loadProducts(categoryId = null) {
   showLoader();
   try {
     const url = categoryId ? `/api/products?category_id=${categoryId}` : '/api/products';
+    console.log('Загрузка товаров:', url);
     const res = await fetch(url);
     products = await res.json();
+    console.log('Товары:', products);
   } catch (e) {
+    console.error('Ошибка загрузки товаров:', e);
     products = getDemoProducts();
   }
   hideLoader();
@@ -98,7 +105,9 @@ async function loadNews() {
   try {
     const res = await fetch('/api/news');
     news = await res.json();
+    console.log('Новости:', news);
   } catch (e) {
+    console.error('Ошибка загрузки новостей:', e);
     news = [];
   }
   renderNews();
@@ -108,6 +117,8 @@ async function loadOrders() {
   showLoader();
   try {
     const userId = tg.initDataUnsafe?.user?.id;
+    console.log('Загрузка заказов для userId:', userId);
+    
     if (!userId) {
       orders = [];
       renderOrders();
@@ -117,6 +128,7 @@ async function loadOrders() {
     
     const res = await fetch(`/api/orders?user_id=${userId}`);
     orders = await res.json();
+    console.log('Заказы:', orders);
     renderOrders();
   } catch (e) {
     console.error('Ошибка загрузки заказов:', e);
@@ -127,20 +139,22 @@ async function loadOrders() {
 
 function getDemoProducts() {
   return [
-    { id: 1, category_id: 1, name: 'Husky Double Ice', description: 'Ледяной манго-маракуйя', price: 450 },
-    { id: 2, category_id: 1, name: 'Brusko Berry', description: 'Смесь лесных ягод', price: 390 },
-    { id: 3, category_id: 1, name: 'SALTIC Lemon', description: 'Свежий лимон с мятой', price: 420 },
-    { id: 4, category_id: 2, name: 'Vaporesso XROS 3', description: 'Компактный под', price: 2490 },
-    { id: 5, category_id: 2, name: 'Voopoo V.Thru', description: 'Стильный POD', price: 1990 },
-    { id: 6, category_id: 3, name: 'Испарители XROS 0.6Ω', description: '4 шт', price: 890 },
-    { id: 7, category_id: 3, name: 'Картриджи V.Thru', description: '3 шт', price: 650 },
-    { id: 8, category_id: 4, name: 'Стартовый набор', description: 'XROS 3 + 2 жидкости', price: 2990 }
+    { id: 1, category_id: 1, name: 'Husky Double Ice', description: 'Ледяной манго-маракуйя', price: 450, image_url: '' },
+    { id: 2, category_id: 1, name: 'Brusko Berry', description: 'Смесь лесных ягод', price: 390, image_url: '' },
+    { id: 3, category_id: 1, name: 'SALTIC Lemon', description: 'Свежий лимон с мятой', price: 420, image_url: '' },
+    { id: 4, category_id: 2, name: 'Vaporesso XROS 3', description: 'Компактный под', price: 2490, image_url: '' },
+    { id: 5, category_id: 2, name: 'Voopoo V.Thru', description: 'Стильный POD', price: 1990, image_url: '' },
+    { id: 6, category_id: 3, name: 'Испарители XROS 0.6Ω', description: '4 шт', price: 890, image_url: '' },
+    { id: 7, category_id: 3, name: 'Картриджи V.Thru', description: '3 шт', price: 650, image_url: '' },
+    { id: 8, category_id: 4, name: 'Стартовый набор', description: 'XROS 3 + 2 жидкости', price: 2990, image_url: '' }
   ];
 }
 
 // === РЕНДЕРИНГ ===
 
 function renderCategories() {
+  if (!categoriesEl) return;
+  
   categoriesEl.innerHTML = '';
   
   const allBtn = document.createElement('button');
@@ -158,9 +172,13 @@ function renderCategories() {
     btn.onclick = () => selectCategory(cat.id);
     categoriesEl.appendChild(btn);
   });
+  
+  console.log('Категории отрендерены:', categoriesEl.children.length);
 }
 
 function renderProducts() {
+  if (!productsGrid) return;
+  
   if (products.length === 0) {
     productsGrid.innerHTML = `
       <div class="empty-state">
@@ -171,11 +189,14 @@ function renderProducts() {
     return;
   }
   
-  productsGrid.innerHTML = products.map(p => `
+  productsGrid.innerHTML = products.map(p => {
+    const hasImage = p.image_url && p.image_url.trim() !== '' && !p.image_url.includes('placeholder');
+    
+    return `
     <div class="product-card" data-id="${p.id}">
       <div class="product-image">
-        ${p.image_url && !p.image_url.includes('placeholder') 
-          ? `<img src="${p.image_url}" alt="${escapeHtml(p.name)}" onerror="this.style.display='none';this.parentElement.textContent='📦'">`
+        ${hasImage 
+          ? `<img src="${p.image_url}" alt="${escapeHtml(p.name)}" onerror="this.style.display='none';this.parentElement.textContent='${getProductEmoji(p)}'">`
           : getProductEmoji(p)}
       </div>
       <div class="product-info">
@@ -187,15 +208,19 @@ function renderProducts() {
         </div>
       </div>
     </div>
-  `).join('');
+  `}).join('');
+  
+  console.log('Товары отрендерены:', products.length);
 }
 
 function renderOrders() {
+  if (!ordersList) return;
+  
   if (orders.length === 0) {
     ordersList.innerHTML = `
       <div class="empty-state">
         <div class="empty-state-icon">📦</div>
-        <div class="empty-state-text">У вас пока нет заказов<br>или они не загружены</div>
+        <div class="empty-state-text">У вас пока нет заказов</div>
       </div>
     `;
     return;
@@ -226,7 +251,6 @@ function showOrderDetail(orderId) {
   
   orderDetailId.textContent = order.order_uuid.substring(0, 8);
   
-  // Загружаем товары заказа
   const itemsHtml = order.items && order.items.length > 0
     ? order.items.map(item => `
         <div class="order-item">
@@ -291,20 +315,27 @@ function showOrderDetail(orderId) {
 }
 
 function renderNews() {
+  if (!newsGrid) return;
+  
   if (news.length === 0) {
     newsGrid.innerHTML = `
       <div class="empty-state">
         <div class="empty-state-icon">📰</div>
-        <div class="empty-state-text">Новостей пока нет<br>заходите позже</div>
+        <div class="empty-state-text">Новостей пока нет</div>
       </div>
     `;
     return;
   }
   
-  newsGrid.innerHTML = news.map(n => `
+  newsGrid.innerHTML = news.map(n => {
+    const hasImage = n.image_url && n.image_url.trim() !== '';
+    
+    return `
     <div class="news-card">
       <div class="news-image">
-        ${n.image_url ? `<img src="${n.image_url}" alt="${escapeHtml(n.title)}">` : '📢'}
+        ${hasImage 
+          ? `<img src="${n.image_url}" alt="${escapeHtml(n.title)}" onerror="this.style.display='none';this.parentElement.textContent='📢'">`
+          : '📢'}
       </div>
       <div class="news-content">
         <h3 class="news-title">${escapeHtml(n.title)}</h3>
@@ -312,7 +343,7 @@ function renderNews() {
         <div class="news-date">${formatEkaterinburgTime(n.created_at)}</div>
       </div>
     </div>
-  `).join('');
+  `}).join('');
 }
 
 function getProductEmoji(product) {
@@ -527,16 +558,8 @@ async function submitOrder(e) {
       updateCartTotal();
       showToast('Заказ оформлен!', 'success');
       
-      // Добавляем заказ в список
-      orders.unshift({
-        id: result.orderId,
-        order_uuid: result.orderId,
-        total_amount: finalTotal,
-        status: 'pending',
-        created_at: new Date().toISOString(),
-        items: orderData.items
-      });
-      renderOrders();
+      // Обновляем список заказов
+      loadOrders();
       
       setTimeout(() => tg.close(), 1500);
     } else {
@@ -573,7 +596,6 @@ function formatPrice(price) {
 
 // === СОБЫТИЯ ===
 
-// Переключение табов
 tabBtns.forEach(btn => {
   btn.addEventListener('click', () => {
     tabBtns.forEach(b => b.classList.remove('active'));
@@ -613,7 +635,6 @@ document.querySelector('#checkoutModal .modal-backdrop').onclick = closeCheckout
 checkoutForm.onsubmit = submitOrder;
 document.querySelector('#orderDetailModal .modal-backdrop').onclick = () => orderDetailModal.classList.remove('active');
 
-// Промокод
 applyPromocode.onclick = async () => {
   const code = promocodeInput.value.trim();
   if (!code) {
@@ -635,8 +656,10 @@ applyPromocode.onclick = async () => {
 };
 
 // Инициализация
+console.log('Инициализация Mini App...');
 loadCategories();
 loadProducts();
+loadNews();
 
 // Настройка темы Telegram
 if (tg.themeParams) {
