@@ -60,10 +60,17 @@ async function start() {
   if (!existingChannel) {
     db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('channel_id', DEFAULT_CHANNEL);
   }
-  
+
+  // Включаем проверку подписки по умолчанию
+  const existingSubCheck = db.prepare('SELECT value FROM settings WHERE key = ?').get('subscription_enabled');
+  if (!existingSubCheck) {
+    db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('subscription_enabled', '1');
+  }
+
   console.log('=== НАСТРОЙКИ ===');
   console.log('TOKEN:', token ? 'OK' : 'MISSING');
   console.log('ADMIN_IDS:', adminIds);
+  console.log('ПРОВЕРКА ПОДПИСКИ: ВКЛЮЧена');
   console.log('=================');
   
   bot = new TelegramBot(token, { polling: true });
@@ -107,15 +114,24 @@ async function start() {
   }
 
   async function checkSubscription(userId) {
-    if (!isSubscriptionCheckEnabled()) return true;
+    const enabled = isSubscriptionCheckEnabled();
     const channelId = getChannelId();
-    if (!channelId) return true;
+    
+    // Если проверка отключена или канал не настроен - пропускаем
+    if (!enabled || !channelId) {
+      return true;
+    }
+    
     try {
+      console.log(`Проверка подписки ${userId} в ${channelId}`);
       const member = await bot.getChatMember(channelId.replace('@', ''), userId);
-      return ['member', 'administrator', 'creator'].includes(member.status);
+      const isMember = ['member', 'administrator', 'creator'].includes(member.status);
+      console.log(`Статус: ${member.status}, подписан: ${isMember}`);
+      return isMember;
     } catch (e) { 
       console.error('Ошибка проверки подписки:', e.message);
-      return true;
+      // Если ошибка - считаем что не подписан
+      return false;
     }
   }
 
