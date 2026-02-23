@@ -16,7 +16,6 @@ let bot;
 let app;
 let WEB_APP_URL = process.env.WEB_APP_URL || 'http://localhost:3001';
 
-// Хранилище состояний
 const adminState = {};
 
 const storage = multer.diskStorage({
@@ -46,7 +45,14 @@ function escapeHtml(text) {
 
 async function start() {
   await db.initDatabase();
-  console.log('✅ БД инициализирована');
+  
+  console.log('=== НАСТРОЙКИ ===');
+  console.log('TOKEN:', token ? 'OK' : 'MISSING');
+  console.log('ADMIN_IDS:', adminIds);
+  console.log('CHANNEL_ID:', CHANNEL_ID);
+  console.log('WEB_APP_URL:', WEB_APP_URL);
+  console.log('PORT:', PORT);
+  console.log('=================');
   
   bot = new TelegramBot(token, { polling: true });
   app = express();
@@ -75,17 +81,20 @@ async function start() {
     } catch (e) { return false; }
   }
 
-  function isAdmin(userId) { return adminIds.includes(parseInt(userId)); }
+  function isAdmin(userId) { 
+    const result = adminIds.includes(parseInt(userId));
+    console.log(`isAdmin(${userId}) = ${result}, adminIds =`, adminIds);
+    return result;
+  }
+  
   function formatPrice(price) { return `${price.toLocaleString('ru-RU')} ₽`; }
 
-  // Главная клавиатура
+  // === ГЛАВНАЯ КЛАВИАТУРА ===
   const mainKbd = {
-    inline_keyboard: [[
-      { text: '🛒 Открыть магазин', web_app: { url: WEB_APP_URL } }
-    ]]
+    inline_keyboard: [[{ text: '🛒 Открыть магазин', web_app: { url: WEB_APP_URL } }]]
   };
 
-  // Админ клавиатура
+  // === АДМИН КЛАВИАТУРА ===
   const adminKbd = {
     inline_keyboard: [
       [{ text: '📊 Статистика', callback_data: 'admin_stats' }],
@@ -97,85 +106,64 @@ async function start() {
     ]
   };
 
-  // Меню товаров
-  const productsMenuKbd = {
-    inline_keyboard: [
-      [{ text: '➕ Добавить товар', callback_data: 'add_product' }],
-      [{ text: '📦 Список товаров', callback_data: 'list_products' }],
-      [{ text: '🔙 Назад', callback_data: 'admin_menu' }]
-    ]
-  };
-
-  // Меню новостей
-  const newsMenuKbd = {
-    inline_keyboard: [
-      [{ text: '➕ Добавить новость', callback_data: 'add_news' }],
-      [{ text: '📰 Список новостей', callback_data: 'list_news' }],
-      [{ text: '🔙 Назад', callback_data: 'admin_menu' }]
-    ]
-  };
-
-  // Меню промокодов
-  const promocodeMenuKbd = {
-    inline_keyboard: [
-      [{ text: '➕ Создать промокод', callback_data: 'add_promocode' }],
-      [{ text: '🎁 Список промокодов', callback_data: 'list_promocodes' }],
-      [{ text: '🔙 Назад', callback_data: 'admin_menu' }]
-    ]
-  };
-
-  async function sendStartMessage(chatId, firstName) {
-    registerUser(chatId, null, firstName, null);
+  bot.onText(/\/start/, async (msg) => {
+    const chatId = msg.chat.id;
+    const firstName = msg.from.first_name;
+    
+    console.log(`/start от ${chatId} (${firstName})`);
+    console.log('isAdmin:', isAdmin(chatId));
+    
+    registerUser(chatId, msg.from.username, firstName, msg.from.last_name);
     
     const isSub = await checkSubscription(chatId);
     if (!isSub) {
       bot.sendMessage(chatId, `⚠️ <b>Для использования бота подпишитесь на канал!</b>\n\n📢 ${escapeHtml(CHANNEL_ID)}\n\nПосле подписки нажмите кнопку:`, {
-        reply_markup: {
-          inline_keyboard: [[{ text: '✅ Я подписался', callback_data: 'check_sub' }]]
-        },
+        reply_markup: { inline_keyboard: [[{ text: '✅ Я подписался', callback_data: 'check_sub' }]] },
         parse_mode: 'HTML'
       });
       return;
     }
     
-    bot.sendMessage(chatId, `👋 Привет, ${escapeHtml(firstName)}!\n\n🛍️ <b>VapeShop</b> — твой магазин`, {
-      reply_markup: isAdmin(chatId) ? adminKbd : mainKbd,
+    const kbd = isAdmin(chatId) ? adminKbd : mainKbd;
+    bot.sendMessage(chatId, `👋 Привет, ${escapeHtml(firstName)}!\n\n🛍️ <b>VapeShop</b>`, {
+      reply_markup: kbd,
       parse_mode: 'HTML'
     });
-  }
-
-  bot.onText(/\/start/, (msg) => {
-    sendStartMessage(msg.chat.id, msg.from.first_name);
   });
 
   bot.on('callback_query', async (query) => {
     const chatId = query.message.chat.id;
     const data = query.data;
     const msgId = query.message.message_id;
+    const firstName = query.from.first_name;
+
+    console.log(`Callback от ${chatId} (${firstName}): ${data}`);
 
     // Проверка подписки
     if (data === 'check_sub') {
       const isSub = await checkSubscription(chatId);
       if (isSub) {
         bot.deleteMessage(chatId, msgId);
-        sendStartMessage(chatId, query.from.first_name);
+        bot.emit('text', { chat: { id: chatId }, from: query.from, text: '/start' });
       } else {
         bot.answerCallbackQuery(query.id, { text: '❌ Подпишитесь на канал!', show_alert: true });
       }
       return;
     }
 
-    // Только для админов
-    if (!isAdmin(chatId)) {
+    // Проверка админа
+    const adminCheck = isAdmin(chatId);
+    console.log(`Admin check для ${chatId}: ${adminCheck}`);
+    
+    if (!adminCheck) {
       bot.answerCallbackQuery(query.id, { text: '❌ Доступ запрещён', show_alert: true });
       return;
     }
 
     // === АДМИН МЕНЮ ===
     if (data === 'admin_menu') {
-      bot.editMessageText('🔑 <b>Админ-панель</b>\n\nВыберите раздел:', {
-        chat_id: chatId,
-        message_id: msgId,
+      bot.editMessageText('🔑 <b>Админ-панель</b>', {
+        chat_id: chatId, message_id: msgId,
         reply_markup: adminKbd,
         parse_mode: 'HTML'
       });
@@ -208,7 +196,7 @@ async function start() {
       orders.forEach(o => {
         const items = db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(o.id);
         const itemsText = items.map(i => `• ${escapeHtml(i.product_name)} x${i.quantity}`).join('\n');
-        bot.sendMessage(chatId, `📦 #${o.order_uuid.substring(0, 8)}\n👤 ${escapeHtml(o.first_name)} (${o.telegram_id})\n💰 ${formatPrice(o.total_amount)}\n📊 ${o.status}\n\n🛒 ${itemsText}`, {
+        bot.sendMessage(chatId, `📦 #${o.order_uuid.substring(0, 8)}\n👤 ${escapeHtml(o.first_name)}\n💰 ${formatPrice(o.total_amount)}\n📊 ${o.status}\n\n🛒 ${itemsText}`, {
           reply_markup: {
             inline_keyboard: [
               [{ text: '✅', callback_data: `confirm_${o.id}` }, { text: '❌', callback_data: `cancel_${o.id}` }],
@@ -240,7 +228,7 @@ async function start() {
         return;
       }
       products.forEach(p => {
-        bot.sendMessage(chatId, `📦 ${escapeHtml(p.name)}\n💰 ${formatPrice(p.price)}\n📂 Категория: ${p.category_id}\n📦 Остаток: ${p.stock}`);
+        bot.sendMessage(chatId, `📦 ${escapeHtml(p.name)}\n💰 ${formatPrice(p.price)}`);
       });
       bot.sendMessage(chatId, 'Список товаров', {
         reply_markup: { inline_keyboard: [[{ text: '🔙 Назад', callback_data: 'admin_menu' }]] }
@@ -268,11 +256,9 @@ async function start() {
         return;
       }
       news.forEach(n => {
-        bot.sendMessage(chatId, `📰 <b>${escapeHtml(n.title)}</b>\n\n${escapeHtml(n.content)}\n\n🕐 ${new Date(n.created_at).toLocaleString('ru-RU')}`, {
+        bot.sendMessage(chatId, `📰 <b>${escapeHtml(n.title)}</b>\n\n${escapeHtml(n.content)}`, {
           parse_mode: 'HTML',
-          reply_markup: {
-            inline_keyboard: [[{ text: '🗑️ Удалить', callback_data: `del_news_${n.id}` }]]
-          }
+          reply_markup: { inline_keyboard: [[{ text: '🗑️ Удалить', callback_data: `del_news_${n.id}` }]] }
         });
       });
       bot.sendMessage(chatId, 'Новости', {
@@ -302,7 +288,7 @@ async function start() {
       }
       let msg = '🎁 <b>Промокоды</b>\n\n';
       promocodes.forEach(p => {
-        msg += `<code>${escapeHtml(p.code)}</code> — ${p.discount}% (${p.uses_count}/${p.max_uses || '∞'})\n`;
+        msg += `<code>${escapeHtml(p.code)}</code> — ${p.discount}%\n`;
       });
       bot.sendMessage(chatId, msg, {
         parse_mode: 'HTML',
@@ -362,13 +348,15 @@ async function start() {
     }
   });
 
-  // Обработка состояний (добавление товара/новости/промокода)
+  // Обработка состояний
   bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
+    const text = msg.text;
+    
+    console.log(`Message от ${chatId}: ${text}`);
+    
     if (!isAdmin(chatId)) return;
     if (!adminState[chatId]) return;
-    
-    const text = msg.text;
     if (text === '❌ Отмена') {
       delete adminState[chatId];
       bot.sendMessage(chatId, '❌ Отменено', { reply_markup: adminKbd });
@@ -379,33 +367,28 @@ async function start() {
 
     // === ДОБАВЛЕНИЕ ТОВАРА ===
     if (state.type === 'product') {
-      if (state.step === 0) { state.name = text; state.step = 1; bot.sendMessage(chatId, '2️⃣ Отправьте описание:'); return; }
-      if (state.step === 1) { state.description = text; state.step = 2; bot.sendMessage(chatId, '3️⃣ Отправьте цену (число):'); return; }
+      if (state.step === 0) { state.name = text; state.step = 1; bot.sendMessage(chatId, '2️⃣ Описание:'); return; }
+      if (state.step === 1) { state.description = text; state.step = 2; bot.sendMessage(chatId, '3️⃣ Цена (число):'); return; }
       if (state.step === 2) {
         const price = parseInt(text);
         if (isNaN(price) || price <= 0) { bot.sendMessage(chatId, '❌ Неверная цена:'); return; }
-        state.price = price; state.step = 3; bot.sendMessage(chatId, '4️⃣ ID категории (1-4):\n1-Жидкости 2-Поды 3-Расходники 4-Наборы'); return;
+        state.price = price; state.step = 3; bot.sendMessage(chatId, '4️⃣ ID категории (1-4):'); return;
       }
       if (state.step === 3) {
         const cat = parseInt(text);
-        if (![1,2,3,4].includes(cat)) { bot.sendMessage(chatId, '❌ Введите 1, 2, 3 или 4:'); return; }
-        state.category_id = cat; state.step = 4; bot.sendMessage(chatId, '5️⃣ Отправьте фото или "пропустить":'); return;
+        if (![1,2,3,4].includes(cat)) { bot.sendMessage(chatId, '❌ Введите 1-4:'); return; }
+        state.category_id = cat; state.step = 4; bot.sendMessage(chatId, '5️⃣ Фото или "пропустить":'); return;
       }
       if (state.step === 4) {
         if (text?.toLowerCase() === 'пропустить') { state.image_url = null; }
         else if (msg.photo?.length) { state.image_url = (await bot.getFileLink(msg.photo[msg.photo.length-1].file_id)).href; }
-        else { bot.sendMessage(chatId, '❌ Отправьте фото или "пропустить":'); return; }
+        else { bot.sendMessage(chatId, '❌ Фото или "пропустить":'); return; }
         
         db.prepare('INSERT INTO products (category_id, name, description, price, image_url, stock) VALUES (?, ?, ?, ?, ?, ?)')
           .run(state.category_id, state.name, state.description, state.price, state.image_url, 100);
         
         bot.sendMessage(chatId, `✅ Товар добавлен!\n\n📦 ${escapeHtml(state.name)}\n💰 ${formatPrice(state.price)}`, {
-          reply_markup: {
-            inline_keyboard: [
-              [{ text: '➕ Ещё', callback_data: 'add_product' }],
-              [{ text: '🔙 В меню', callback_data: 'admin_menu' }]
-            ]
-          }
+          reply_markup: { inline_keyboard: [[{ text: '➕ Ещё', callback_data: 'add_product' }], [{ text: '🔙 В меню', callback_data: 'admin_menu' }]] }
         });
         delete adminState[chatId];
       }
@@ -413,15 +396,14 @@ async function start() {
 
     // === ДОБАВЛЕНИЕ НОВОСТИ ===
     if (state.type === 'news') {
-      if (state.step === 0) { state.title = text; state.step = 1; bot.sendMessage(chatId, '2️⃣ Отправьте текст новости:'); return; }
-      if (state.step === 1) { state.content = text; state.step = 2; bot.sendMessage(chatId, '3️⃣ Отправьте фото или "пропустить":'); return; }
+      if (state.step === 0) { state.title = text; state.step = 1; bot.sendMessage(chatId, '2️⃣ Текст новости:'); return; }
+      if (state.step === 1) { state.content = text; state.step = 2; bot.sendMessage(chatId, '3️⃣ Фото или "пропустить":'); return; }
       if (state.step === 2) {
         if (text?.toLowerCase() === 'пропустить') { state.image_url = null; }
         else if (msg.photo?.length) { state.image_url = (await bot.getFileLink(msg.photo[msg.photo.length-1].file_id)).href; }
-        else { bot.sendMessage(chatId, '❌ Отправьте фото или "пропустить":'); return; }
+        else { bot.sendMessage(chatId, '❌ Фото или "пропустить":'); return; }
         
         db.prepare('INSERT INTO news (title, content, image_url) VALUES (?, ?, ?)').run(state.title, state.content, state.image_url);
-        
         bot.sendMessage(chatId, `✅ Новость добавлена!\n\n📰 ${escapeHtml(state.title)}`, {
           reply_markup: { inline_keyboard: [[{ text: '🔙 В меню', callback_data: 'admin_menu' }]] }
         });
@@ -434,19 +416,17 @@ async function start() {
       if (state.step === 0) {
         const code = text.toUpperCase().replace(/[^A-Z0-9]/g, '');
         if (code.length < 3) { bot.sendMessage(chatId, '❌ Минимум 3 символа:'); return; }
-        state.code = code; state.step = 1; bot.sendMessage(chatId, '2️⃣ Размер скидки % (1-100):'); return;
+        state.code = code; state.step = 1; bot.sendMessage(chatId, '2️⃣ Скидка % (1-100):'); return;
       }
       if (state.step === 1) {
         const disc = parseInt(text);
         if (isNaN(disc) || disc < 1 || disc > 100) { bot.sendMessage(chatId, '❌ Введите 1-100:'); return; }
-        state.discount = disc; state.step = 2; bot.sendMessage(chatId, '3️⃣ Лимит использований (0 = безлимит):'); return;
+        state.discount = disc; state.step = 2; bot.sendMessage(chatId, '3️⃣ Лимит (0 = безлимит):'); return;
       }
       if (state.step === 2) {
         const max = parseInt(text);
         state.max_uses = max === 0 ? null : max;
-        
         db.prepare('INSERT INTO promocodes (code, discount, max_uses) VALUES (?, ?, ?)').run(state.code, state.discount, state.max_uses);
-        
         bot.sendMessage(chatId, `✅ Промокод создан!\n\n🎁 <code>${state.code}</code> — ${state.discount}%`, {
           parse_mode: 'HTML',
           reply_markup: { inline_keyboard: [[{ text: '🔙 В меню', callback_data: 'admin_menu' }]] }
@@ -483,13 +463,9 @@ async function start() {
     items.forEach(i => stmt.run(orderId, i.product_id, i.name, i.quantity, i.price));
     adminIds.forEach(aid => {
       const itemsText = items.map(i => `• ${escapeHtml(i.name)} x${i.quantity}`).join('\n');
-      bot.sendMessage(aid, `🔔 <b>Новый заказ!</b>\n\n📦 #${uuid.substring(0, 8)}\n👤 ${userId}\n💰 ${formatPrice(totalAmount)}\n\n🛒 ${itemsText}`, {
+      bot.sendMessage(aid, `🔔 <b>Новый заказ!</b>\n\n📦 #${uuid.substring(0, 8)}\n💰 ${formatPrice(totalAmount)}\n\n🛒 ${itemsText}`, {
         parse_mode: 'HTML',
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: '✅', callback_data: `confirm_${orderId}` }, { text: '❌', callback_data: `cancel_${orderId}` }]
-          ]
-        }
+        reply_markup: { inline_keyboard: [[{ text: '✅', callback_data: `confirm_${orderId}` }, { text: '❌', callback_data: `cancel_${orderId}` }]] }
       });
     });
     bot.sendMessage(userId, `✅ <b>Заказ #${uuid.substring(0, 8)} принят!</b>`, { parse_mode: 'HTML' });
@@ -497,7 +473,7 @@ async function start() {
   });
 
   app.listen(PORT, () => console.log(`🚀 Порт ${PORT}`));
-  console.log('🤖 Бот запущен');
+  console.log('🤖 Бот запущен и готов!');
 }
 
 start().catch(console.error);
