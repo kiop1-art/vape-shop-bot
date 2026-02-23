@@ -545,7 +545,8 @@ ${statusEmojis[order.status] || '📦'} <b>Завершённый</b>
       return;
     }
 
-    if (state.type === 'broadcast') {
+    const state = adminState[chatId];
+    if (state && state.type === 'broadcast') {
       if (state.step === 0) {
         state.message = msg;
         state.step = 1;
