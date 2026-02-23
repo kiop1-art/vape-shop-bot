@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>VapeShop</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-content">
+        <div class="logo">
+          <span class="logo-icon">💨</span>
+          <span class="logo-text">VapeShop</span>
+        </div>
+        <button class="cart-btn" id="cartBtn">
+          <span class="cart-icon">🛒</span>
+          <span class="cart-count" id="cartCount">0</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Categories -->
+    <nav class="categories" id="categories">
+      <button class="category-btn active" data-category="all">Все</button>
+    </nav>
+
+    <!-- Products Grid -->
+    <main class="products-grid" id="productsGrid">
+      <!-- Products will be loaded here -->
+    </main>
+
+    <!-- Cart Modal -->
+    <div class="modal" id="cartModal">
+      <div class="modal-overlay"></div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>🛒 Корзина</h2>
+          <button class="modal-close" id="closeCart">&times;</button>
+        </div>
+        <div class="cart-items" id="cartItems">
+          <!-- Cart items will be here -->
+        </div>
+        <div class="cart-footer">
+          <div class="cart-total">
+            <span>Итого:</span>
+            <span class="total-price" id="totalPrice">0 ₽</span>
+          </div>
+          <button class="checkout-btn" id="checkoutBtn">
+            Оформить заказ
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Checkout Modal -->
+    <div class="modal" id="checkoutModal">
+      <div class="modal-overlay"></div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>📝 Оформление заказа</h2>
+          <button class="modal-close" id="closeCheckout">&times;</button>
+        </div>
+        <form class="checkout-form" id="checkoutForm">
+          <div class="form-group">
+            <label for="contactInfo">📞 Контакты</label>
+            <input type="text" id="contactInfo" placeholder="@username или телефон" required>
+          </div>
+          <div class="form-group">
+            <label for="deliveryAddress">📍 Адрес доставки</label>
+            <textarea id="deliveryAddress" placeholder="Город, улица, дом, квартира" rows="3"></textarea>
+          </div>
+          <div class="form-group">
+            <label for="comment">💬 Комментарий</label>
+            <textarea id="comment" placeholder="Пожелания к заказу" rows="2"></textarea>
+          </div>
+          <div class="order-summary">
+            <h3>📦 Состав заказа</h3>
+            <div id="orderSummary"></div>
+          </div>
+          <div class="checkout-total">
+            <span>К оплате:</span>
+            <span class="total-amount" id="totalAmount">0 ₽</span>
+          </div>
+          <button type="submit" class="confirm-btn">
+            ✅ Подтвердить заказ
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast" id="toast"></div>
+
+    <!-- Loading Spinner -->
+    <div class="loader" id="loader">
+      <div class="spinner"></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
