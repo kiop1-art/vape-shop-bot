@@ -7,15 +7,24 @@ let products = [];
 let categories = [];
 let news = [];
 let orders = [];
+let favorites = JSON.parse(localStorage.getItem('vapeshop_favorites') || '[]');
 let currentFilter = 'all';
+let currentSort = 'default';
 let currentDiscount = 0;
 let appliedPromocode = null;
+let searchQuery = '';
 
 const categoriesEl = document.getElementById('categories');
 const categoriesWrapper = document.getElementById('categoriesWrapper');
 const productsGrid = document.getElementById('productsGrid');
+const favoritesGrid = document.getElementById('favoritesGrid');
+const favoritesEmpty = document.getElementById('favoritesEmpty');
 const ordersList = document.getElementById('ordersList');
 const newsGrid = document.getElementById('newsGrid');
+const searchBtn = document.getElementById('searchBtn');
+const searchBar = document.getElementById('searchBar');
+const searchInput = document.getElementById('searchInput');
+const searchClose = document.getElementById('searchClose');
 const cartBtn = document.getElementById('cartBtn');
 const cartCount = document.getElementById('cartCount');
 const cartModal = document.getElementById('cartModal');
@@ -36,9 +45,11 @@ const loader = document.getElementById('loader');
 const orderDetailModal = document.getElementById('orderDetailModal');
 const orderDetailId = document.getElementById('orderDetailId');
 const orderDetailBody = document.getElementById('orderDetailBody');
+const sortOptions = document.getElementById('sortOptions');
 
 const tabBtns = document.querySelectorAll('.tab-btn');
 const shopTab = document.getElementById('shopTab');
+const favoritesTab = document.getElementById('favoritesTab');
 const ordersTab = document.getElementById('ordersTab');
 const newsTab = document.getElementById('newsTab');
 
@@ -67,15 +78,52 @@ function formatEkaterinburgTime(dateString) {
   }
 }
 
+// Сохранение корзины
+function saveCart() {
+  localStorage.setItem('vapeshop_cart', JSON.stringify(cart));
+}
+
+function loadCart() {
+  const saved = localStorage.getItem('vapeshop_cart');
+  if (saved) {
+    try {
+      cart = JSON.parse(saved);
+    } catch (e) {
+      cart = [];
+    }
+  }
+}
+
+// Избранное
+function saveFavorites() {
+  localStorage.setItem('vapeshop_favorites', JSON.stringify(favorites));
+}
+
+function toggleFavorite(productId) {
+  const index = favorites.indexOf(productId);
+  if (index > -1) {
+    favorites.splice(index, 1);
+    showToast('❌ Удалено из избранного', 'error');
+  } else {
+    favorites.push(productId);
+    showToast('❤️ Добавлено в избранное', 'success');
+  }
+  saveFavorites();
+  renderProducts();
+  renderFavorites();
+}
+
+function isFavorite(productId) {
+  return favorites.includes(productId);
+}
+
 // === ЗАГРУЗКА ДАННЫХ ===
 
 async function loadCategories() {
   try {
     const res = await fetch('/api/categories');
     categories = await res.json();
-    console.log('Категории:', categories);
   } catch (e) {
-    console.error('Ошибка загрузки категорий:', e);
     categories = [
       { id: 1, name: '💧 Жидкости' },
       { id: 2, name: '🔥 Поды' },
@@ -90,12 +138,9 @@ async function loadProducts(categoryId = null) {
   showLoader();
   try {
     const url = categoryId ? `/api/products?category_id=${categoryId}` : '/api/products';
-    console.log('Загрузка товаров:', url);
     const res = await fetch(url);
     products = await res.json();
-    console.log('Товары:', products);
   } catch (e) {
-    console.error('Ошибка загрузки товаров:', e);
     products = getDemoProducts();
   }
   hideLoader();
@@ -106,9 +151,7 @@ async function loadNews() {
   try {
     const res = await fetch('/api/news');
     news = await res.json();
-    console.log('Новости:', news);
   } catch (e) {
-    console.error('Ошибка загрузки новостей:', e);
     news = [];
   }
   renderNews();
@@ -118,8 +161,6 @@ async function loadOrders() {
   showLoader();
   try {
     const userId = tg.initDataUnsafe?.user?.id;
-    console.log('Загрузка заказов для userId:', userId);
-    
     if (!userId) {
       orders = [];
       renderOrders();
@@ -129,10 +170,8 @@ async function loadOrders() {
     
     const res = await fetch(`/api/orders?user_id=${userId}`);
     orders = await res.json();
-    console.log('Заказы:', orders);
     renderOrders();
   } catch (e) {
-    console.error('Ошибка загрузки заказов:', e);
     orders = [];
   }
   hideLoader();
@@ -173,25 +212,69 @@ function renderCategories() {
     btn.onclick = () => selectCategory(cat.id);
     categoriesEl.appendChild(btn);
   });
+}
+
+function getSortedProducts(productList) {
+  let sorted = [...productList];
   
-  console.log('Категории отрендерены:', categoriesEl.children.length);
+  switch (currentSort) {
+    case 'price-asc':
+      sorted.sort((a, b) => a.price - b.price);
+      break;
+    case 'price-desc':
+      sorted.sort((a, b) => b.price - a.price);
+      break;
+    case 'name':
+      sorted.sort((a, b) => a.name.localeCompare(b.name));
+      break;
+    default:
+      break;
+  }
+  
+  return sorted;
+}
+
+function getFilteredProducts() {
+  let filtered = products;
+  
+  // Фильтр по категории
+  const activeCategory = document.querySelector('.category-btn.active');
+  if (activeCategory && activeCategory.dataset.category !== 'all') {
+    const catId = parseInt(activeCategory.dataset.category);
+    filtered = filtered.filter(p => p.category_id === catId);
+  }
+  
+  // Поиск
+  if (searchQuery) {
+    const query = searchQuery.toLowerCase();
+    filtered = filtered.filter(p => 
+      p.name.toLowerCase().includes(query) ||
+      p.description.toLowerCase().includes(query)
+    );
+  }
+  
+  return filtered;
 }
 
 function renderProducts() {
   if (!productsGrid) return;
   
-  if (products.length === 0) {
+  let filtered = getFilteredProducts();
+  let sorted = getSortedProducts(filtered);
+  
+  if (sorted.length === 0) {
     productsGrid.innerHTML = `
       <div class="empty-state">
         <div class="empty-state-icon">📭</div>
-        <div class="empty-state-text">В этой категории<br>пока нет товаров</div>
+        <div class="empty-state-text">Товары не найдены</div>
       </div>
     `;
     return;
   }
   
-  productsGrid.innerHTML = products.map(p => {
+  productsGrid.innerHTML = sorted.map(p => {
     const hasImage = p.image_url && p.image_url.trim() !== '' && !p.image_url.includes('placeholder');
+    const isFav = isFavorite(p.id);
     
     return `
     <div class="product-card" data-id="${p.id}">
@@ -199,6 +282,7 @@ function renderProducts() {
         ${hasImage 
           ? `<img src="${p.image_url}" alt="${escapeHtml(p.name)}" onerror="this.style.display='none';this.parentElement.textContent='${getProductEmoji(p)}'">`
           : getProductEmoji(p)}
+        <button class="favorite-btn ${isFav ? 'active' : ''}" onclick="toggleFavorite(${p.id})">❤️</button>
       </div>
       <div class="product-info">
         <h3 class="product-name">${escapeHtml(p.name)}</h3>
@@ -210,14 +294,47 @@ function renderProducts() {
       </div>
     </div>
   `}).join('');
+}
+
+function renderFavorites() {
+  if (!favoritesGrid || !favoritesEmpty) return;
   
-  console.log('Товары отрендерены:', products.length);
+  const favProducts = products.filter(p => favorites.includes(p.id));
+  
+  if (favProducts.length === 0) {
+    favoritesGrid.style.display = 'none';
+    favoritesEmpty.style.display = 'block';
+  } else {
+    favoritesGrid.style.display = 'grid';
+    favoritesEmpty.style.display = 'none';
+    favoritesGrid.innerHTML = favProducts.map(p => {
+      const hasImage = p.image_url && p.image_url.trim() !== '';
+      const isFav = isFavorite(p.id);
+      
+      return `
+      <div class="product-card" data-id="${p.id}">
+        <div class="product-image">
+          ${hasImage 
+            ? `<img src="${p.image_url}" alt="${escapeHtml(p.name)}" onerror="this.style.display='none';this.parentElement.textContent='${getProductEmoji(p)}'">`
+            : getProductEmoji(p)}
+          <button class="favorite-btn ${isFav ? 'active' : ''}" onclick="toggleFavorite(${p.id})">❤️</button>
+        </div>
+        <div class="product-info">
+          <h3 class="product-name">${escapeHtml(p.name)}</h3>
+          <p class="product-description">${escapeHtml(p.description)}</p>
+          <div class="product-footer">
+            <span class="product-price">${formatPrice(p.price)}</span>
+            <button class="add-to-cart-btn" onclick="addToCart(${p.id})">+</button>
+          </div>
+        </div>
+      </div>
+    `}).join('');
+  }
 }
 
 function renderOrders() {
   if (!ordersList) return;
   
-  // Фильтрация заказов
   const filteredOrders = getFilteredOrders(currentFilter);
   
   if (filteredOrders.length === 0) {
@@ -279,59 +396,63 @@ function showOrderDetail(orderId) {
       `).join('')
     : '<p>Нет товаров</p>';
   
+  const repeatButton = order.status === 'completed' 
+    ? `<button class="btn-primary" onclick="repeatOrder(${order.id})" style="margin-top: 16px;">🔄 Повторить заказ</button>`
+    : '';
+  
   orderDetailBody.innerHTML = `
     <div class="order-detail">
       <div class="status-badge" style="background: ${status.color}20; color: ${status.color}; border-color: ${status.color}">
         ${status.text}
       </div>
-
+      
       <div class="detail-section">
         <h4>📅 Дата заказа</h4>
         <p>${formatEkaterinburgTime(order.created_at)}</p>
       </div>
-
+      
       <div class="detail-section">
         <h4>💰 Сумма</h4>
         <p class="price-large">${formatPrice(order.total_amount)}</p>
       </div>
-
+      
       ${order.contact_info ? `
       <div class="detail-section">
         <h4>📞 Контакты</h4>
         <p>${escapeHtml(order.contact_info)}</p>
       </div>
       ` : ''}
-
+      
       ${order.delivery_address ? `
       <div class="detail-section">
         <h4>📍 Адрес</h4>
         <p>${escapeHtml(order.delivery_address)}</p>
       </div>
       ` : ''}
-
+      
       ${order.comment ? `
       <div class="detail-section">
         <h4>💬 Комментарий</h4>
         <p>${escapeHtml(order.comment)}</p>
       </div>
       ` : ''}
-
+      
       ${order.promocode ? `
       <div class="detail-section">
         <h4>🎁 Промокод</h4>
         <p>${escapeHtml(order.promocode)}</p>
       </div>
       ` : ''}
-
+      
       <div class="detail-section">
         <h4>🛒 Товары</h4>
         <div class="order-items">${itemsHtml}</div>
       </div>
-
-      ${order.status === 'completed' ? `<button class="btn-primary" onclick="repeatOrder(${order.id})" style="margin-top: 16px;">🔄 Повторить заказ</button>` : ''}
+      
+      ${repeatButton}
     </div>
   `;
-
+  
   orderDetailModal.classList.add('active');
 }
 
@@ -355,6 +476,7 @@ function repeatOrder(orderId) {
   
   renderCart();
   updateCartTotal();
+  saveCart();
   orderDetailModal.classList.remove('active');
   showToast('✅ Товары добавлены в корзину', 'success');
   
@@ -491,6 +613,7 @@ function addToCart(productId) {
   }
   
   renderCart();
+  saveCart();
   showToast('Добавлено в корзину', 'success');
   
   if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
@@ -506,6 +629,7 @@ function updateQty(productId, delta) {
   }
   
   renderCart();
+  saveCart();
   
   if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
 }
@@ -598,6 +722,7 @@ async function submitOrder(e) {
     if (result.success) {
       closeCheckoutModal();
       cart = [];
+      saveCart();
       currentDiscount = 0;
       appliedPromocode = null;
       promocodeInput.value = '';
@@ -605,7 +730,6 @@ async function submitOrder(e) {
       updateCartTotal();
       showToast('Заказ оформлен!', 'success');
       
-      // Обновляем список заказов
       loadOrders();
       
       setTimeout(() => tg.close(), 1500);
@@ -643,6 +767,40 @@ function formatPrice(price) {
 
 // === СОБЫТИЯ ===
 
+// Поиск
+if (searchBtn && searchBar && searchClose) {
+  searchBtn.onclick = () => {
+    searchBar.classList.add('active');
+    searchInput.focus();
+  };
+  
+  searchClose.onclick = () => {
+    searchBar.classList.remove('active');
+    searchInput.value = '';
+    searchQuery = '';
+    renderProducts();
+  };
+  
+  searchInput.oninput = (e) => {
+    searchQuery = e.target.value;
+    renderProducts();
+  };
+}
+
+// Сортировка
+if (sortOptions) {
+  sortOptions.addEventListener('click', (e) => {
+    if (e.target.classList.contains('sort-btn')) {
+      document.querySelectorAll('.sort-btn').forEach(btn => btn.classList.remove('active'));
+      e.target.classList.add('active');
+      currentSort = e.target.dataset.sort;
+      renderProducts();
+      
+      if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+    }
+  });
+}
+
 // Фильтры заказов
 const orderFilters = document.getElementById('orderFilters');
 if (orderFilters) {
@@ -668,20 +826,34 @@ tabBtns.forEach(btn => {
     
     if (tabName === 'shop') {
       shopTab.classList.add('active');
+      favoritesTab.classList.remove('active');
       ordersTab.classList.remove('active');
       newsTab.classList.remove('active');
       categoriesWrapper.style.display = 'block';
+      sortOptions.style.display = 'flex';
+    } else if (tabName === 'favorites') {
+      shopTab.classList.remove('active');
+      favoritesTab.classList.add('active');
+      ordersTab.classList.remove('active');
+      newsTab.classList.remove('active');
+      categoriesWrapper.style.display = 'none';
+      sortOptions.style.display = 'none';
+      renderFavorites();
     } else if (tabName === 'orders') {
       shopTab.classList.remove('active');
+      favoritesTab.classList.remove('active');
       ordersTab.classList.add('active');
       newsTab.classList.remove('active');
       categoriesWrapper.style.display = 'none';
+      sortOptions.style.display = 'none';
       loadOrders();
     } else {
       shopTab.classList.remove('active');
+      favoritesTab.classList.remove('active');
       ordersTab.classList.remove('active');
       newsTab.classList.add('active');
       categoriesWrapper.style.display = 'none';
+      sortOptions.style.display = 'none';
       loadNews();
     }
     
@@ -720,9 +892,11 @@ applyPromocode.onclick = async () => {
 
 // Инициализация
 console.log('Инициализация Mini App...');
+loadCart();
 loadCategories();
 loadProducts();
 loadNews();
+updateCartCount();
 
 // Настройка темы Telegram
 if (tg.themeParams) {

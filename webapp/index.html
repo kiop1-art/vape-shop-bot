@@ -18,20 +18,30 @@
           <span class="logo-icon">💨</span>
           <span class="logo-text">VapeShop</span>
         </div>
-        <button class="cart-btn" id="cartBtn">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="9" cy="21" r="1"></circle>
-            <circle cx="20" cy="21" r="1"></circle>
-            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
-          </svg>
-          <span class="cart-count" id="cartCount">0</span>
-        </button>
+        <div class="header-actions">
+          <button class="search-btn" id="searchBtn">🔍</button>
+          <button class="cart-btn" id="cartBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="9" cy="21" r="1"></circle>
+              <circle cx="20" cy="21" r="1"></circle>
+              <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+            </svg>
+            <span class="cart-count" id="cartCount">0</span>
+          </button>
+        </div>
+      </div>
+      
+      <!-- Search Bar -->
+      <div class="search-bar" id="searchBar">
+        <input type="text" id="searchInput" placeholder="Поиск товаров...">
+        <button class="search-close" id="searchClose">×</button>
       </div>
     </header>
 
     <!-- Tabs -->
     <nav class="tabs">
       <button class="tab-btn active" data-tab="shop">🛒 Магазин</button>
+      <button class="tab-btn" data-tab="favorites">❤️ Избранное</button>
       <button class="tab-btn" data-tab="orders">📦 Заказы</button>
       <button class="tab-btn" data-tab="news">📰 Новости</button>
     </nav>
@@ -43,12 +53,28 @@
 
     <!-- Shop Tab -->
     <main class="tab-content active" id="shopTab">
+      <!-- Sort Options -->
+      <div class="sort-options" id="sortOptions">
+        <button class="sort-btn active" data-sort="default">По умолчанию</button>
+        <button class="sort-btn" data-sort="price-asc">💰 По возрастанию</button>
+        <button class="sort-btn" data-sort="price-desc">💰 По убыванию</button>
+        <button class="sort-btn" data-sort="name">🔤 По названию</button>
+      </div>
+      
       <div class="products-grid" id="productsGrid"></div>
+    </main>
+
+    <!-- Favorites Tab -->
+    <main class="tab-content" id="favoritesTab">
+      <div class="products-grid" id="favoritesGrid"></div>
+      <div class="empty-state" id="favoritesEmpty" style="display: none;">
+        <div class="empty-state-icon">❤️</div>
+        <div class="empty-state-text">Нет избранных товаров<br>Добавьте товары через кнопку ❤️</div>
+      </div>
     </main>
 
     <!-- Orders Tab -->
     <main class="tab-content" id="ordersTab">
-      <!-- Order Filters -->
       <div class="order-filters" id="orderFilters">
         <button class="filter-btn active" data-filter="all">📋 Все</button>
         <button class="filter-btn" data-filter="pending">⏳ Новые</button>
