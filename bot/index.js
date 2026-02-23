@@ -46,6 +46,40 @@ function escapeHtml(text) {
 async function start() {
   await db.initDatabase();
   
+  // Автозаполнение базы если пустая
+  const cats = db.prepare('SELECT COUNT(*) as c FROM categories').get();
+  if (cats.c === 0) {
+    console.log('📊 База пустая, заполняю...');
+    
+    // Категории
+    const categories = [
+      { name: '💧 Жидкости', description: 'Жидкости для вейпов', icon: '💧', sort_order: 1 },
+      { name: '🔥 Поды', description: 'Pod-системы', icon: '🔥', sort_order: 2 },
+      { name: '🔧 Расходники', description: 'Испарители, картриджи', icon: '🔧', sort_order: 3 },
+      { name: '🎁 Наборы', description: 'Выгодные наборы', icon: '🎁', sort_order: 4 }
+    ];
+    categories.forEach(cat => {
+      db.prepare('INSERT INTO categories (name, description, icon, sort_order) VALUES (?, ?, ?, ?)')
+        .run(cat.name, cat.description, cat.icon, cat.sort_order);
+    });
+    
+    // Товары
+    const products = [
+      { category_id: 1, name: 'Husky Double Ice', description: 'Ледяной манго-маракуйя', price: 450, stock: 50 },
+      { category_id: 1, name: 'Brusko Berry', description: 'Смесь лесных ягод', price: 390, stock: 30 },
+      { category_id: 2, name: 'Vaporesso XROS 3', description: 'Компактный под', price: 2490, stock: 15 },
+      { category_id: 2, name: 'Voopoo V.Thru', description: 'Стильный POD', price: 1990, stock: 20 },
+      { category_id: 3, name: 'Испарители XROS 0.6Ω', description: '4 шт', price: 890, stock: 100 },
+      { category_id: 4, name: 'Стартовый набор', description: 'XROS 3 + 2 жидкости', price: 2990, stock: 10 }
+    ];
+    products.forEach(prod => {
+      db.prepare('INSERT INTO products (category_id, name, description, price, stock) VALUES (?, ?, ?, ?, ?)')
+        .run(prod.category_id, prod.name, prod.description, prod.price, prod.stock);
+    });
+    
+    console.log('✅ База заполнена!');
+  }
+  
   try {
     db.exec(`CREATE TABLE IF NOT EXISTS settings (
       key TEXT PRIMARY KEY,
