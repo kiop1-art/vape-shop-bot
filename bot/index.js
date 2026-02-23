@@ -10,7 +10,7 @@ const { v4: uuidv4 } = require('uuid');
 const token = process.env.BOT_TOKEN;
 const adminIds = process.env.ADMIN_IDS?.split(',').map(id => parseInt(id.trim())) || [];
 const PORT = process.env.PORT || 8080;
-const CHANNEL_ID = process.env.CHANNEL_ID || '@vapeshop_channel';
+const DEFAULT_CHANNEL = process.env.CHANNEL_ID || '@vapeshop_channel';
 
 let bot;
 let app;
@@ -46,12 +46,23 @@ function escapeHtml(text) {
 async function start() {
   await db.initDatabase();
   
+  // Создаём таблицу настроек
+  db.run(`CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+  
+  // Устанавливаем канал по умолчанию если нет
+  const existingChannel = db.prepare('SELECT value FROM settings WHERE key = ?').get('channel_id');
+  if (!existingChannel) {
+    db.prepare('INSERT INTO settings (key, value) VALUES (?, ?)').run('channel_id', DEFAULT_CHANNEL);
+  }
+  
   console.log('=== НАСТРОЙКИ ===');
   console.log('TOKEN:', token ? 'OK' : 'MISSING');
   console.log('ADMIN_IDS:', adminIds);
-  console.log('CHANNEL_ID:', CHANNEL_ID);
-  console.log('WEB_APP_URL:', WEB_APP_URL);
-  console.log('PORT:', PORT);
+  console.log('DEFAULT_CHANNEL:', DEFAULT_CHANNEL);
   console.log('=================');
   
   bot = new TelegramBot(token, { polling: true });
@@ -74,32 +85,53 @@ async function start() {
     } catch (e) { console.error(e); }
   }
 
+  function getChannelId() {
+    const setting = db.prepare('SELECT value FROM settings WHERE key = ?').get('channel_id');
+    return setting?.value || DEFAULT_CHANNEL;
+  }
+
+  function setChannelId(channelId) {
+    db.prepare('INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)')
+      .run('channel_id', channelId);
+  }
+
+  function isSubscriptionCheckEnabled() {
+    const setting = db.prepare('SELECT value FROM settings WHERE key = ?').get('subscription_enabled');
+    return setting?.value === '1';
+  }
+
+  function setSubscriptionCheckEnabled(enabled) {
+    db.prepare('INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)')
+      .run('subscription_enabled', enabled ? '1' : '0');
+  }
+
   async function checkSubscription(userId) {
-    // Всегда возвращаем true (отключаем проверку)
-    // Чтобы включить - раскомментируй код ниже:
-    /*
+    if (!isSubscriptionCheckEnabled()) return true;
+    
+    const channelId = getChannelId();
+    if (!channelId) return true;
+    
     try {
-      const member = await bot.getChatMember(CHANNEL_ID.replace('@', ''), userId);
+      const member = await bot.getChatMember(channelId.replace('@', ''), userId);
       return ['member', 'administrator', 'creator'].includes(member.status);
-    } catch (e) { return false; }
-    */
-    return true;
+    } catch (e) { 
+      console.log('Ошибка проверки подписки:', e.message);
+      return false; 
+    }
   }
 
   function isAdmin(userId) { 
     const result = adminIds.includes(parseInt(userId));
-    console.log(`isAdmin(${userId}) = ${result}, adminIds =`, adminIds);
     return result;
   }
   
   function formatPrice(price) { return `${price.toLocaleString('ru-RU')} ₽`; }
 
-  // === ГЛАВНАЯ КЛАВИАТУРА ===
+  // === КЛАВИАТУРЫ ===
   const mainKbd = {
     inline_keyboard: [[{ text: '🛒 Открыть магазин', web_app: { url: WEB_APP_URL } }]]
   };
 
-  // === АДМИН КЛАВИАТУРА ===
   const adminKbd = {
     inline_keyboard: [
       [{ text: '📊 Статистика', callback_data: 'admin_stats' }],
@@ -107,7 +139,15 @@ async function start() {
       [{ text: '➕ Добавить товар', callback_data: 'admin_add_product' }],
       [{ text: '📰 Новости', callback_data: 'admin_news' }],
       [{ text: '🎁 Промокоды', callback_data: 'admin_promocodes' }],
-      [{ text: '👥 Пользователи', callback_data: 'admin_users' }]
+      [{ text: '⚙️ Настройки', callback_data: 'admin_settings' }]
+    ]
+  };
+
+  const settingsKbd = {
+    inline_keyboard: [
+      [{ text: '📢 Канал', callback_data: 'set_channel' }],
+      [{ text: '🔔 Подписка: ВКЛ', callback_data: 'toggle_subscription' }],
+      [{ text: '🔙 Назад', callback_data: 'admin_menu' }]
     ]
   };
 
@@ -115,14 +155,12 @@ async function start() {
     const chatId = msg.chat.id;
     const firstName = msg.from.first_name;
     
-    console.log(`/start от ${chatId} (${firstName})`);
-    console.log('isAdmin:', isAdmin(chatId));
-    
     registerUser(chatId, msg.from.username, firstName, msg.from.last_name);
     
     const isSub = await checkSubscription(chatId);
     if (!isSub) {
-      bot.sendMessage(chatId, `⚠️ <b>Для использования бота подпишитесь на канал!</b>\n\n📢 ${escapeHtml(CHANNEL_ID)}\n\nПосле подписки нажмите кнопку:`, {
+      const channelId = getChannelId();
+      bot.sendMessage(chatId, `⚠️ <b>Для использования бота подпишитесь на канал!</b>\n\n📢 ${escapeHtml(channelId)}\n\nПосле подписки нажмите кнопку:`, {
         reply_markup: { inline_keyboard: [[{ text: '✅ Я подписался', callback_data: 'check_sub' }]] },
         parse_mode: 'HTML'
       });
@@ -142,8 +180,6 @@ async function start() {
     const msgId = query.message.message_id;
     const firstName = query.from.first_name;
 
-    console.log(`Callback от ${chatId} (${firstName}): ${data}`);
-
     // Проверка подписки
     if (data === 'check_sub') {
       const isSub = await checkSubscription(chatId);
@@ -157,10 +193,7 @@ async function start() {
     }
 
     // Проверка админа
-    const adminCheck = isAdmin(chatId);
-    console.log(`Admin check для ${chatId}: ${adminCheck}`);
-    
-    if (!adminCheck) {
+    if (!isAdmin(chatId)) {
       bot.answerCallbackQuery(query.id, { text: '❌ Доступ запрещён', show_alert: true });
       return;
     }
@@ -170,6 +203,56 @@ async function start() {
       bot.editMessageText('🔑 <b>Админ-панель</b>', {
         chat_id: chatId, message_id: msgId,
         reply_markup: adminKbd,
+        parse_mode: 'HTML'
+      });
+      return;
+    }
+
+    // === НАСТРОЙКИ ===
+    if (data === 'admin_settings') {
+      const channelId = getChannelId();
+      const subEnabled = isSubscriptionCheckEnabled();
+      const subStatus = subEnabled ? 'ВКЛ ✅' : 'ВЫКЛ ❌';
+      
+      bot.sendMessage(chatId, `⚙️ <b>Настройки бота</b>\n\n📢 Канал: <code>${escapeHtml(channelId)}</code>\n🔔 Проверка подписки: ${subStatus}`, {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '📢 Изменить канал', callback_data: 'set_channel' }],
+            [{ text: subEnabled ? '🔔 Отключить проверку' : '🔔 Включить проверку', callback_data: 'toggle_subscription' }],
+            [{ text: '🔙 Назад', callback_data: 'admin_menu' }]
+          ]
+        },
+        parse_mode: 'HTML'
+      });
+      return;
+    }
+
+    if (data === 'set_channel') {
+      adminState[chatId] = { step: 0, type: 'set_channel' };
+      const channelId = getChannelId();
+      bot.sendMessage(chatId, `📢 <b>Настройка канала</b>\n\nТекущий канал: <code>${escapeHtml(channelId)}</code>\n\nОтправьте новый username канала (например, @mychannel):`, {
+        parse_mode: 'HTML',
+        reply_markup: { keyboard: [['❌ Отмена']], resize_keyboard: true }
+      });
+      return;
+    }
+
+    if (data === 'toggle_subscription') {
+      const current = isSubscriptionCheckEnabled();
+      setSubscriptionCheckEnabled(!current);
+      
+      const channelId = getChannelId();
+      const subEnabled = !current;
+      const subStatus = subEnabled ? 'ВКЛ ✅' : 'ВЫКЛ ❌';
+      
+      bot.sendMessage(chatId, `✅ Проверка подписки ${subEnabled ? 'включена' : 'отключена'}\n\n📢 Канал: <code>${escapeHtml(channelId)}</code>\n🔔 Проверка: ${subStatus}`, {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '📢 Изменить канал', callback_data: 'set_channel' }],
+            [{ text: subEnabled ? '🔔 Отключить проверку' : '🔔 Включить проверку', callback_data: 'toggle_subscription' }],
+            [{ text: '🔙 Назад', callback_data: 'admin_menu' }]
+          ]
+        },
         parse_mode: 'HTML'
       });
       return;
@@ -358,8 +441,6 @@ async function start() {
     const chatId = msg.chat.id;
     const text = msg.text;
     
-    console.log(`Message от ${chatId}: ${text}`);
-    
     if (!isAdmin(chatId)) return;
     if (!adminState[chatId]) return;
     if (text === '❌ Отмена') {
@@ -369,6 +450,27 @@ async function start() {
     }
 
     const state = adminState[chatId];
+
+    // === НАСТРОЙКА КАНАЛА ===
+    if (state.type === 'set_channel') {
+      const channelId = text.trim();
+      if (!channelId.startsWith('@')) {
+        bot.sendMessage(chatId, '❌ Username должен начинаться с @ (например, @mychannel):');
+        return;
+      }
+      setChannelId(channelId);
+      bot.sendMessage(chatId, `✅ Канал изменён на <code>${escapeHtml(channelId)}</code>`, {
+        parse_mode: 'HTML',
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '📢 Изменить канал', callback_data: 'set_channel' }],
+            [{ text: '🔙 В меню', callback_data: 'admin_menu' }]
+          ]
+        }
+      });
+      delete adminState[chatId];
+      return;
+    }
 
     // === ДОБАВЛЕНИЕ ТОВАРА ===
     if (state.type === 'product') {
@@ -478,7 +580,7 @@ async function start() {
   });
 
   app.listen(PORT, () => console.log(`🚀 Порт ${PORT}`));
-  console.log('🤖 Бот запущен и готов!');
+  console.log('🤖 Бот запущен!');
 }
 
 start().catch(console.error);
