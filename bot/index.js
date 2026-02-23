@@ -110,17 +110,28 @@ async function start() {
   }
 
   async function checkSubscription(userId) {
-    if (!isSubscriptionCheckEnabled()) return true;
+    if (!isSubscriptionCheckEnabled()) {
+      console.log('Проверка подписки отключена');
+      return true;
+    }
     
     const channelId = getChannelId();
-    if (!channelId) return true;
+    if (!channelId) {
+      console.log('Канал не настроен');
+      return true;
+    }
     
     try {
+      console.log(`Проверка подписки ${userId} в канале ${channelId}`);
       const member = await bot.getChatMember(channelId.replace('@', ''), userId);
-      return ['member', 'administrator', 'creator'].includes(member.status);
+      console.log(`Статус участника: ${member.status}`);
+      const isMember = ['member', 'administrator', 'creator'].includes(member.status);
+      return isMember;
     } catch (e) { 
-      console.log('Ошибка проверки подписки:', e.message);
-      return false; 
+      console.error('Ошибка проверки подписки:', e.message);
+      // Если бот не админ в канале - отключаем проверку и возвращаем true
+      console.log('Бот не может проверить подписку - возможно он не администратор в канале');
+      return true;
     }
   }
 
