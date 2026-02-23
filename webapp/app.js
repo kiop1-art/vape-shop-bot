@@ -13,6 +13,14 @@ let currentSort = 'default';
 let currentDiscount = 0;
 let appliedPromocode = null;
 let searchQuery = '';
+let isSubscribed = false;
+
+// Элементы подписки
+const subscriptionScreen = document.getElementById('subscriptionScreen');
+const mainApp = document.getElementById('mainApp');
+const subscribeBtn = document.getElementById('subscribeBtn');
+const checkSubscribeBtn = document.getElementById('checkSubscribeBtn');
+const subscriptionError = document.getElementById('subscriptionError');
 
 const categoriesEl = document.getElementById('categories');
 const categoriesWrapper = document.getElementById('categoriesWrapper');
@@ -765,6 +773,64 @@ function formatPrice(price) {
   return `${price.toLocaleString('ru-RU')} ₽`;
 }
 
+// === ПРОВЕРКА ПОДПИСКИ ===
+
+async function checkSubscription() {
+  const userId = tg.initDataUnsafe?.user?.id;
+  if (!userId) {
+    // Если нет userId - показываем приложение
+    showMainApp();
+    return;
+  }
+  
+  try {
+    const res = await fetch(`/api/check-subscription?user_id=${userId}`);
+    const data = await res.json();
+    
+    if (data.subscribed) {
+      showMainApp();
+    } else {
+      showSubscriptionScreen(data.channel);
+    }
+  } catch (e) {
+    console.error('Ошибка проверки подписки:', e);
+    // Если ошибка - показываем приложение
+    showMainApp();
+  }
+}
+
+function showSubscriptionScreen(channel) {
+  subscriptionScreen.style.display = 'flex';
+  mainApp.style.display = 'none';
+  
+  if (subscribeBtn) {
+    subscribeBtn.onclick = () => {
+      if (channel && channel.startsWith('@')) {
+        tg.openTelegramLink(`https://t.me/${channel}`);
+      }
+    };
+  }
+  
+  if (checkSubscribeBtn) {
+    checkSubscribeBtn.onclick = () => {
+      checkSubscription();
+    };
+  }
+}
+
+function showMainApp() {
+  isSubscribed = true;
+  subscriptionScreen.style.display = 'none';
+  mainApp.style.display = 'block';
+  
+  // Загружаем данные
+  loadCategories();
+  loadProducts();
+  loadNews();
+  loadCart();
+  updateCartCount();
+}
+
 // === СОБЫТИЯ ===
 
 // Поиск
@@ -892,11 +958,7 @@ applyPromocode.onclick = async () => {
 
 // Инициализация
 console.log('Инициализация Mini App...');
-loadCart();
-loadCategories();
-loadProducts();
-loadNews();
-updateCartCount();
+checkSubscription();
 
 // Настройка темы Telegram
 if (tg.themeParams) {

@@ -11,163 +11,181 @@
 </head>
 <body>
   <div class="app">
-    <!-- Header -->
-    <header class="header">
-      <div class="header-content">
-        <div class="logo">
-          <span class="logo-icon">💨</span>
-          <span class="logo-text">VapeShop</span>
-        </div>
-        <div class="header-actions">
-          <button class="search-btn" id="searchBtn">🔍</button>
-          <button class="cart-btn" id="cartBtn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="9" cy="21" r="1"></circle>
-              <circle cx="20" cy="21" r="1"></circle>
-              <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
-            </svg>
-            <span class="cart-count" id="cartCount">0</span>
-          </button>
-        </div>
+    <!-- Subscription Check Screen -->
+    <div class="subscription-screen" id="subscriptionScreen">
+      <div class="subscription-content">
+        <div class="subscription-icon">📢</div>
+        <h2>Подпишитесь на наш канал</h2>
+        <p>Для доступа к магазину необходимо подписаться на наш канал</p>
+        <button class="btn-subscribe" id="subscribeBtn">
+          <span>📢</span>
+          <span>Подписаться</span>
+        </button>
+        <button class="btn-check" id="checkSubscribeBtn">
+          <span>✅</span>
+          <span>Я подписался</span>
+        </button>
+        <p class="subscription-error" id="subscriptionError"></p>
       </div>
-      
-      <!-- Search Bar -->
-      <div class="search-bar" id="searchBar">
-        <input type="text" id="searchInput" placeholder="Поиск товаров...">
-        <button class="search-close" id="searchClose">×</button>
-      </div>
-    </header>
-
-    <!-- Tabs -->
-    <nav class="tabs">
-      <button class="tab-btn active" data-tab="shop">🛒 Магазин</button>
-      <button class="tab-btn" data-tab="favorites">❤️ Избранное</button>
-      <button class="tab-btn" data-tab="orders">📦 Заказы</button>
-      <button class="tab-btn" data-tab="news">📰 Новости</button>
-    </nav>
-
-    <!-- Categories -->
-    <div class="categories-wrapper" id="categoriesWrapper">
-      <nav class="categories" id="categories"></nav>
     </div>
 
-    <!-- Shop Tab -->
-    <main class="tab-content active" id="shopTab">
-      <!-- Sort Options -->
-      <div class="sort-options" id="sortOptions">
-        <button class="sort-btn active" data-sort="default">По умолчанию</button>
-        <button class="sort-btn" data-sort="price-asc">💰 По возрастанию</button>
-        <button class="sort-btn" data-sort="price-desc">💰 По убыванию</button>
-        <button class="sort-btn" data-sort="name">🔤 По названию</button>
-      </div>
-      
-      <div class="products-grid" id="productsGrid"></div>
-    </main>
-
-    <!-- Favorites Tab -->
-    <main class="tab-content" id="favoritesTab">
-      <div class="products-grid" id="favoritesGrid"></div>
-      <div class="empty-state" id="favoritesEmpty" style="display: none;">
-        <div class="empty-state-icon">❤️</div>
-        <div class="empty-state-text">Нет избранных товаров<br>Добавьте товары через кнопку ❤️</div>
-      </div>
-    </main>
-
-    <!-- Orders Tab -->
-    <main class="tab-content" id="ordersTab">
-      <div class="order-filters" id="orderFilters">
-        <button class="filter-btn active" data-filter="all">📋 Все</button>
-        <button class="filter-btn" data-filter="pending">⏳ Новые</button>
-        <button class="filter-btn" data-filter="confirmed">✅ Принятые</button>
-        <button class="filter-btn" data-filter="completed">✨ Завершённые</button>
-      </div>
-      
-      <div class="orders-list" id="ordersList"></div>
-    </main>
-
-    <!-- News Tab -->
-    <main class="tab-content" id="newsTab">
-      <div class="news-grid" id="newsGrid"></div>
-    </main>
-
-    <!-- Cart Modal -->
-    <div class="modal" id="cartModal">
-      <div class="modal-backdrop"></div>
-      <div class="modal-content">
-        <div class="modal-header">
-          <h2>Корзина</h2>
-          <button class="modal-close" id="closeCart">×</button>
-        </div>
-        <div class="modal-body" id="cartItems"></div>
-        <div class="modal-footer">
-          <div class="promocode-section">
-            <input type="text" id="promocodeInput" placeholder="Промокод" maxlength="20">
-            <button class="btn-apply" id="applyPromocode">Применить</button>
+    <!-- Main App (hidden until subscribed) -->
+    <div class="main-app" id="mainApp" style="display: none;">
+      <!-- Header -->
+      <header class="header">
+        <div class="header-content">
+          <div class="logo">
+            <span class="logo-icon">💨</span>
+            <span class="logo-text">VapeShop</span>
           </div>
-          <div class="cart-summary">
-            <span>Итого</span>
-            <div class="cart-total-wrapper">
-              <span class="cart-total-old" id="totalOld"></span>
-              <span class="cart-total" id="totalPrice">0 ₽</span>
+          <div class="header-actions">
+            <button class="search-btn" id="searchBtn">🔍</button>
+            <button class="cart-btn" id="cartBtn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="9" cy="21" r="1"></circle>
+                <circle cx="20" cy="21" r="1"></circle>
+                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+              </svg>
+              <span class="cart-count" id="cartCount">0</span>
+            </button>
+          </div>
+        </div>
+        
+        <!-- Search Bar -->
+        <div class="search-bar" id="searchBar">
+          <input type="text" id="searchInput" placeholder="Поиск товаров...">
+          <button class="search-close" id="searchClose">×</button>
+        </div>
+      </header>
+
+      <!-- Tabs -->
+      <nav class="tabs">
+        <button class="tab-btn active" data-tab="shop">🛒 Магазин</button>
+        <button class="tab-btn" data-tab="favorites">❤️ Избранное</button>
+        <button class="tab-btn" data-tab="orders">📦 Заказы</button>
+        <button class="tab-btn" data-tab="news">📰 Новости</button>
+      </nav>
+
+      <!-- Categories -->
+      <div class="categories-wrapper" id="categoriesWrapper">
+        <nav class="categories" id="categories"></nav>
+      </div>
+
+      <!-- Shop Tab -->
+      <main class="tab-content active" id="shopTab">
+        <div class="sort-options" id="sortOptions">
+          <button class="sort-btn active" data-sort="default">По умолчанию</button>
+          <button class="sort-btn" data-sort="price-asc">💰 По возрастанию</button>
+          <button class="sort-btn" data-sort="price-desc">💰 По убыванию</button>
+          <button class="sort-btn" data-sort="name">🔤 По названию</button>
+        </div>
+        <div class="products-grid" id="productsGrid"></div>
+      </main>
+
+      <!-- Favorites Tab -->
+      <main class="tab-content" id="favoritesTab">
+        <div class="products-grid" id="favoritesGrid"></div>
+        <div class="empty-state" id="favoritesEmpty" style="display: none;">
+          <div class="empty-state-icon">❤️</div>
+          <div class="empty-state-text">Нет избранных товаров<br>Добавьте товары через кнопку ❤️</div>
+        </div>
+      </main>
+
+      <!-- Orders Tab -->
+      <main class="tab-content" id="ordersTab">
+        <div class="order-filters" id="orderFilters">
+          <button class="filter-btn active" data-filter="all">📋 Все</button>
+          <button class="filter-btn" data-filter="pending">⏳ Новые</button>
+          <button class="filter-btn" data-filter="confirmed">✅ Принятые</button>
+          <button class="filter-btn" data-filter="completed">✨ Завершённые</button>
+        </div>
+        <div class="orders-list" id="ordersList"></div>
+      </main>
+
+      <!-- News Tab -->
+      <main class="tab-content" id="newsTab">
+        <div class="news-grid" id="newsGrid"></div>
+      </main>
+
+      <!-- Cart Modal -->
+      <div class="modal" id="cartModal">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2>Корзина</h2>
+            <button class="modal-close" id="closeCart">×</button>
+          </div>
+          <div class="modal-body" id="cartItems"></div>
+          <div class="modal-footer">
+            <div class="promocode-section">
+              <input type="text" id="promocodeInput" placeholder="Промокод" maxlength="20">
+              <button class="btn-apply" id="applyPromocode">Применить</button>
             </div>
+            <div class="cart-summary">
+              <span>Итого</span>
+              <div class="cart-total-wrapper">
+                <span class="cart-total-old" id="totalOld"></span>
+                <span class="cart-total" id="totalPrice">0 ₽</span>
+              </div>
+            </div>
+            <button class="btn-primary" id="checkoutBtn">Оформить заказ</button>
           </div>
-          <button class="btn-primary" id="checkoutBtn">Оформить заказ</button>
         </div>
       </div>
-    </div>
 
-    <!-- Checkout Modal -->
-    <div class="modal" id="checkoutModal">
-      <div class="modal-backdrop"></div>
-      <div class="modal-content">
-        <div class="modal-header">
-          <h2>Оформление</h2>
-          <button class="modal-close" id="closeCheckout">×</button>
-        </div>
-        <form class="modal-body checkout-form" id="checkoutForm">
-          <div class="form-group">
-            <label>📞 Контакты</label>
-            <input type="text" id="contactInfo" placeholder="@username или телефон" required>
+      <!-- Checkout Modal -->
+      <div class="modal" id="checkoutModal">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2>Оформление</h2>
+            <button class="modal-close" id="closeCheckout">×</button>
           </div>
-          <div class="form-group">
-            <label>📍 Адрес доставки</label>
-            <textarea id="deliveryAddress" placeholder="Город, улица, дом" rows="2"></textarea>
-          </div>
-          <div class="form-group">
-            <label>💬 Комментарий</label>
-            <textarea id="comment" placeholder="Пожелания" rows="2"></textarea>
-          </div>
-          <div class="order-summary" id="orderSummary"></div>
-          <div class="cart-summary">
-            <span>К оплате</span>
-            <span class="cart-total" id="totalAmount">0 ₽</span>
-          </div>
-          <button type="submit" class="btn-primary">Подтвердить заказ</button>
-        </form>
-      </div>
-    </div>
-
-    <!-- Order Detail Modal -->
-    <div class="modal" id="orderDetailModal">
-      <div class="modal-backdrop"></div>
-      <div class="modal-content">
-        <div class="modal-header">
-          <h2>Заказ #<span id="orderDetailId"></span></h2>
-          <button class="modal-close" id="closeOrderDetail">×</button>
-        </div>
-        <div class="modal-body" id="orderDetailBody"></div>
-        <div class="modal-footer">
-          <button class="btn-primary" onclick="document.getElementById('orderDetailModal').classList.remove('active')">Закрыть</button>
+          <form class="modal-body checkout-form" id="checkoutForm">
+            <div class="form-group">
+              <label>📞 Контакты</label>
+              <input type="text" id="contactInfo" placeholder="@username или телефон" required>
+            </div>
+            <div class="form-group">
+              <label>📍 Адрес доставки</label>
+              <textarea id="deliveryAddress" placeholder="Город, улица, дом" rows="2"></textarea>
+            </div>
+            <div class="form-group">
+              <label>💬 Комментарий</label>
+              <textarea id="comment" placeholder="Пожелания" rows="2"></textarea>
+            </div>
+            <div class="order-summary" id="orderSummary"></div>
+            <div class="cart-summary">
+              <span>К оплате</span>
+              <span class="cart-total" id="totalAmount">0 ₽</span>
+            </div>
+            <button type="submit" class="btn-primary">Подтвердить заказ</button>
+          </form>
         </div>
       </div>
-    </div>
 
-    <!-- Toast -->
-    <div class="toast" id="toast"></div>
+      <!-- Order Detail Modal -->
+      <div class="modal" id="orderDetailModal">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2>Заказ #<span id="orderDetailId"></span></h2>
+            <button class="modal-close" id="closeOrderDetail">×</button>
+          </div>
+          <div class="modal-body" id="orderDetailBody"></div>
+          <div class="modal-footer">
+            <button class="btn-primary" onclick="document.getElementById('orderDetailModal').classList.remove('active')">Закрыть</button>
+          </div>
+        </div>
+      </div>
 
-    <!-- Loader -->
-    <div class="loader" id="loader">
-      <div class="spinner"></div>
+      <!-- Toast -->
+      <div class="toast" id="toast"></div>
+
+      <!-- Loader -->
+      <div class="loader" id="loader">
+        <div class="spinner"></div>
+      </div>
     </div>
   </div>
 

@@ -202,16 +202,7 @@ async function start() {
     
     registerUser(chatId, msg.from.username, firstName, msg.from.last_name);
     
-    const isSub = await checkSubscription(chatId);
-    if (!isSub) {
-      const channelId = getChannelId();
-      bot.sendMessage(chatId, `⚠️ <b>Для использования бота подпишитесь на канал!</b>\n\n📢 ${escapeHtml(channelId)}\n\nПосле подписки нажмите кнопку:`, {
-        reply_markup: { inline_keyboard: [[{ text: '✅ Я подписался', callback_data: 'check_sub' }]] },
-        parse_mode: 'HTML'
-      });
-      return;
-    }
-    
+    // Всегда показываем главное меню без проверки подписки
     const kbd = isAdmin(chatId) ? adminKbd : mainKbd;
     bot.sendMessage(chatId, `👋 Привет, ${escapeHtml(firstName)}!\n\n🛍️ <b>VapeShop</b>`, {
       reply_markup: kbd,
@@ -224,18 +215,6 @@ async function start() {
     const data = query.data;
     const msgId = query.message.message_id;
     const firstName = query.from.first_name;
-
-    // Проверка подписки
-    if (data === 'check_sub') {
-      const isSub = await checkSubscription(chatId);
-      if (isSub) {
-        bot.deleteMessage(chatId, msgId);
-        bot.emit('text', { chat: { id: chatId }, from: query.from, text: '/start' });
-      } else {
-        bot.answerCallbackQuery(query.id, { text: '❌ Подпишитесь на канал!', show_alert: true });
-      }
-      return;
-    }
 
     // Проверка админа
     if (!isAdmin(chatId)) {
@@ -919,6 +898,27 @@ ${statusEmojis[order.status] || '📦'} <b>Завершённый</b>
     });
     
     res.json(orders);
+  });
+  
+  // API для проверки подписки
+  app.get('/api/check-subscription', async (req, res) => {
+    const userId = parseInt(req.query.user_id);
+    if (!userId) return res.json({ subscribed: false, error: 'No user_id' });
+    
+    const enabled = isSubscriptionCheckEnabled();
+    const channelId = getChannelId();
+    
+    if (!enabled || !channelId) {
+      return res.json({ subscribed: true, message: 'Check disabled' });
+    }
+    
+    try {
+      const member = await bot.getChatMember(channelId.replace('@', ''), userId);
+      const isMember = ['member', 'administrator', 'creator'].includes(member.status);
+      res.json({ subscribed: isMember, channel: channelId });
+    } catch (e) {
+      res.json({ subscribed: false, error: e.message, channel: channelId });
+    }
   });
   
   app.post('/api/validate-promocode', (req, res) => {
