@@ -76,6 +76,30 @@ async function start() {
     }
   }
 
+  function escapeMarkdown(text) {
+    if (!text) return '';
+    // Экранируем специальные символы Markdown
+    return String(text)
+      .replace(/_/g, '\\_')
+      .replace(/\*/g, '\\*')
+      .replace(/\[/g, '\\[')
+      .replace(/]/g, '\\]')
+      .replace(/\(/g, '\\(')
+      .replace(/\)/g, '\\)')
+      .replace(/~/g, '\\~')
+      .replace(/`/g, '\\`')
+      .replace(/>/g, '\\>')
+      .replace(/#/g, '\\#')
+      .replace(/\+/g, '\\+')
+      .replace(/-/g, '\\-')
+      .replace(/=/g, '\\=')
+      .replace(/\|/g, '\\|')
+      .replace(/\{/g, '\\{')
+      .replace(/\}/g, '\\}')
+      .replace(/\./g, '\\.')
+      .replace(/!/g, '\\!');
+  }
+  
   function isAdmin(userId) { 
     return adminIds.includes(parseInt(userId)); 
   }
@@ -470,7 +494,11 @@ ${itemsText}`, {
       return;
     }
     news.forEach(n => {
-      bot.sendMessage(chatId, `📰 **${n.title}**\n\n${n.content}\n\n🕐 ${new Date(n.created_at).toLocaleString('ru-RU')}`, {
+      bot.sendMessage(chatId, `📰 *${escapeMarkdown(n.title)}*
+
+${escapeMarkdown(n.content)}
+
+🕐 ${new Date(n.created_at).toLocaleString('ru-RU')}`, {
         parse_mode: 'Markdown',
         reply_markup: {
           inline_keyboard: [[{ text: '🗑️ Удалить', callback_data: `delete_news_${n.id}` }]]
@@ -653,7 +681,7 @@ ${itemsText}`, {
           
           bot.sendMessage(chatId, `✅ **Товар добавлен!**
 
-📦 ${state.name}
+📦 ${escapeMarkdown(state.name)}
 💰 ${formatPrice(state.price)}
 📂 ${category?.name || '—'}
 ${state.image_url ? '🖼️ Фото: загружено' : '🖼️ Фото: нет'}`, {
@@ -720,7 +748,7 @@ ${state.image_url ? '🖼️ Фото: загружено' : '🖼️ Фото: 
           
           bot.sendMessage(chatId, `✅ **Новость добавлена!**
 
-📰 ${state.title}`, {
+📰 ${escapeMarkdown(state.title)}`, {
             parse_mode: 'Markdown',
             reply_markup: {
               inline_keyboard: [[{ text: '🔙 В меню', callback_data: 'back_admin' }]]
