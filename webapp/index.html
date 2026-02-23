@@ -32,6 +32,7 @@
     <!-- Tabs -->
     <nav class="tabs">
       <button class="tab-btn active" data-tab="shop">🛒 Магазин</button>
+      <button class="tab-btn" data-tab="orders">📦 Заказы</button>
       <button class="tab-btn" data-tab="news">📰 Новости</button>
     </nav>
 
@@ -43,6 +44,11 @@
     <!-- Shop Tab -->
     <main class="tab-content active" id="shopTab">
       <div class="products-grid" id="productsGrid"></div>
+    </main>
+
+    <!-- Orders Tab -->
+    <main class="tab-content" id="ordersTab">
+      <div class="orders-list" id="ordersList"></div>
     </main>
 
     <!-- News Tab -->
@@ -104,6 +110,21 @@
           </div>
           <button type="submit" class="btn-primary">Подтвердить заказ</button>
         </form>
+      </div>
+    </div>
+
+    <!-- Order Detail Modal -->
+    <div class="modal" id="orderDetailModal">
+      <div class="modal-backdrop"></div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Заказ #<span id="orderDetailId"></span></h2>
+          <button class="modal-close" id="closeOrderDetail">×</button>
+        </div>
+        <div class="modal-body" id="orderDetailBody"></div>
+        <div class="modal-footer">
+          <button class="btn-primary" onclick="document.getElementById('orderDetailModal').classList.remove('active')">Закрыть</button>
+        </div>
       </div>
     </div>
 

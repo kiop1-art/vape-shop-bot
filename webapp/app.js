@@ -6,12 +6,14 @@ let cart = [];
 let products = [];
 let categories = [];
 let news = [];
+let orders = [];
 let currentDiscount = 0;
 let appliedPromocode = null;
 
 const categoriesEl = document.getElementById('categories');
 const categoriesWrapper = document.getElementById('categoriesWrapper');
 const productsGrid = document.getElementById('productsGrid');
+const ordersList = document.getElementById('ordersList');
 const newsGrid = document.getElementById('newsGrid');
 const cartBtn = document.getElementById('cartBtn');
 const cartCount = document.getElementById('cartCount');
@@ -30,11 +32,37 @@ const orderSummary = document.getElementById('orderSummary');
 const totalAmount = document.getElementById('totalAmount');
 const toast = document.getElementById('toast');
 const loader = document.getElementById('loader');
+const orderDetailModal = document.getElementById('orderDetailModal');
+const orderDetailId = document.getElementById('orderDetailId');
+const orderDetailBody = document.getElementById('orderDetailBody');
 
 // Tabs
 const tabBtns = document.querySelectorAll('.tab-btn');
 const shopTab = document.getElementById('shopTab');
+const ordersTab = document.getElementById('ordersTab');
 const newsTab = document.getElementById('newsTab');
+
+// Статусы заказов на русском
+const statusLabels = {
+  'pending': { text: '⏳ На обработке', color: '#f59e0b' },
+  'confirmed': { text: '✅ Подтверждён', color: '#10b981' },
+  'shipping': { text: '🚀 В доставке', color: '#3b82f6' },
+  'completed': { text: '✨ Завершён', color: '#8b5cf6' },
+  'cancelled': { text: '❌ Отменён', color: '#ef4444' }
+};
+
+// Время для Екатеринбурга (UTC+5)
+function formatEkaterinburgTime(dateString) {
+  const date = new Date(dateString);
+  return date.toLocaleString('ru-RU', {
+    timeZone: 'Asia/Yekaterinburg',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}
 
 // === ЗАГРУЗКА ДАННЫХ ===
 
@@ -76,14 +104,37 @@ async function loadNews() {
   renderNews();
 }
 
+async function loadOrders() {
+  showLoader();
+  try {
+    const userId = tg.initDataUnsafe?.user?.id;
+    if (!userId) {
+      orders = [];
+      renderOrders();
+      hideLoader();
+      return;
+    }
+    
+    const res = await fetch(`/api/orders?user_id=${userId}`);
+    orders = await res.json();
+    renderOrders();
+  } catch (e) {
+    console.error('Ошибка загрузки заказов:', e);
+    orders = [];
+  }
+  hideLoader();
+}
+
 function getDemoProducts() {
   return [
     { id: 1, category_id: 1, name: 'Husky Double Ice', description: 'Ледяной манго-маракуйя', price: 450 },
     { id: 2, category_id: 1, name: 'Brusko Berry', description: 'Смесь лесных ягод', price: 390 },
-    { id: 3, category_id: 2, name: 'Vaporesso XROS 3', description: 'Компактный под', price: 2490 },
-    { id: 4, category_id: 2, name: 'Voopoo V.Thru', description: 'Стильный POD', price: 1990 },
-    { id: 5, category_id: 3, name: 'Испарители XROS 0.6Ω', description: '4 шт', price: 890 },
-    { id: 6, category_id: 4, name: 'Стартовый набор', description: 'XROS 3 + 2 жидкости', price: 2990 }
+    { id: 3, category_id: 1, name: 'SALTIC Lemon', description: 'Свежий лимон с мятой', price: 420 },
+    { id: 4, category_id: 2, name: 'Vaporesso XROS 3', description: 'Компактный под', price: 2490 },
+    { id: 5, category_id: 2, name: 'Voopoo V.Thru', description: 'Стильный POD', price: 1990 },
+    { id: 6, category_id: 3, name: 'Испарители XROS 0.6Ω', description: '4 шт', price: 890 },
+    { id: 7, category_id: 3, name: 'Картриджи V.Thru', description: '3 шт', price: 650 },
+    { id: 8, category_id: 4, name: 'Стартовый набор', description: 'XROS 3 + 2 жидкости', price: 2990 }
   ];
 }
 
@@ -139,6 +190,106 @@ function renderProducts() {
   `).join('');
 }
 
+function renderOrders() {
+  if (orders.length === 0) {
+    ordersList.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">📦</div>
+        <div class="empty-state-text">У вас пока нет заказов<br>или они не загружены</div>
+      </div>
+    `;
+    return;
+  }
+  
+  ordersList.innerHTML = orders.map(order => {
+    const status = statusLabels[order.status] || { text: order.status, color: '#888' };
+    return `
+      <div class="order-card" onclick="showOrderDetail(${order.id})">
+        <div class="order-header">
+          <span class="order-id">#${order.order_uuid.substring(0, 8)}</span>
+          <span class="order-status" style="color: ${status.color}">${status.text}</span>
+        </div>
+        <div class="order-info">
+          <span class="order-date">${formatEkaterinburgTime(order.created_at)}</span>
+          <span class="order-total">${formatPrice(order.total_amount)}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function showOrderDetail(orderId) {
+  const order = orders.find(o => o.id === orderId);
+  if (!order) return;
+  
+  const status = statusLabels[order.status] || { text: order.status, color: '#888' };
+  
+  orderDetailId.textContent = order.order_uuid.substring(0, 8);
+  
+  // Загружаем товары заказа
+  const itemsHtml = order.items && order.items.length > 0
+    ? order.items.map(item => `
+        <div class="order-item">
+          <span>${escapeHtml(item.product_name)} × ${item.quantity}</span>
+          <span>${formatPrice(item.price * item.quantity)}</span>
+        </div>
+      `).join('')
+    : '<p>Нет товаров</p>';
+  
+  orderDetailBody.innerHTML = `
+    <div class="order-detail">
+      <div class="status-badge" style="background: ${status.color}20; color: ${status.color}; border-color: ${status.color}">
+        ${status.text}
+      </div>
+      
+      <div class="detail-section">
+        <h4>📅 Дата заказа</h4>
+        <p>${formatEkaterinburgTime(order.created_at)}</p>
+      </div>
+      
+      <div class="detail-section">
+        <h4>💰 Сумма</h4>
+        <p class="price-large">${formatPrice(order.total_amount)}</p>
+      </div>
+      
+      ${order.contact_info ? `
+      <div class="detail-section">
+        <h4>📞 Контакты</h4>
+        <p>${escapeHtml(order.contact_info)}</p>
+      </div>
+      ` : ''}
+      
+      ${order.delivery_address ? `
+      <div class="detail-section">
+        <h4>📍 Адрес</h4>
+        <p>${escapeHtml(order.delivery_address)}</p>
+      </div>
+      ` : ''}
+      
+      ${order.comment ? `
+      <div class="detail-section">
+        <h4>💬 Комментарий</h4>
+        <p>${escapeHtml(order.comment)}</p>
+      </div>
+      ` : ''}
+      
+      ${order.promocode ? `
+      <div class="detail-section">
+        <h4>🎁 Промокод</h4>
+        <p>${escapeHtml(order.promocode)}</p>
+      </div>
+      ` : ''}
+      
+      <div class="detail-section">
+        <h4>🛒 Товары</h4>
+        <div class="order-items">${itemsHtml}</div>
+      </div>
+    </div>
+  `;
+  
+  orderDetailModal.classList.add('active');
+}
+
 function renderNews() {
   if (news.length === 0) {
     newsGrid.innerHTML = `
@@ -158,7 +309,7 @@ function renderNews() {
       <div class="news-content">
         <h3 class="news-title">${escapeHtml(n.title)}</h3>
         <p class="news-text">${escapeHtml(n.content)}</p>
-        <div class="news-date">${new Date(n.created_at).toLocaleDateString('ru-RU')}</div>
+        <div class="news-date">${formatEkaterinburgTime(n.created_at)}</div>
       </div>
     </div>
   `).join('');
@@ -375,6 +526,18 @@ async function submitOrder(e) {
       renderCart();
       updateCartTotal();
       showToast('Заказ оформлен!', 'success');
+      
+      // Добавляем заказ в список
+      orders.unshift({
+        id: result.orderId,
+        order_uuid: result.orderId,
+        total_amount: finalTotal,
+        status: 'pending',
+        created_at: new Date().toISOString(),
+        items: orderData.items
+      });
+      renderOrders();
+      
       setTimeout(() => tg.close(), 1500);
     } else {
       showToast('Ошибка оформления', 'error');
@@ -420,10 +583,18 @@ tabBtns.forEach(btn => {
     
     if (tabName === 'shop') {
       shopTab.classList.add('active');
+      ordersTab.classList.remove('active');
       newsTab.classList.remove('active');
       categoriesWrapper.style.display = 'block';
+    } else if (tabName === 'orders') {
+      shopTab.classList.remove('active');
+      ordersTab.classList.add('active');
+      newsTab.classList.remove('active');
+      categoriesWrapper.style.display = 'none';
+      loadOrders();
     } else {
       shopTab.classList.remove('active');
+      ordersTab.classList.remove('active');
       newsTab.classList.add('active');
       categoriesWrapper.style.display = 'none';
       loadNews();
@@ -440,6 +611,7 @@ checkoutBtn.onclick = openCheckout;
 closeCheckout.onclick = closeCheckoutModal;
 document.querySelector('#checkoutModal .modal-backdrop').onclick = closeCheckoutModal;
 checkoutForm.onsubmit = submitOrder;
+document.querySelector('#orderDetailModal .modal-backdrop').onclick = () => orderDetailModal.classList.remove('active');
 
 // Промокод
 applyPromocode.onclick = async () => {
@@ -465,3 +637,11 @@ applyPromocode.onclick = async () => {
 // Инициализация
 loadCategories();
 loadProducts();
+
+// Настройка темы Telegram
+if (tg.themeParams) {
+  if (tg.themeParams.bg_color) document.documentElement.style.setProperty('--tg-theme-bg-color', tg.themeParams.bg_color);
+  if (tg.themeParams.text_color) document.documentElement.style.setProperty('--tg-theme-text-color', tg.themeParams.text_color);
+  if (tg.themeParams.button_color) document.documentElement.style.setProperty('--tg-theme-button-color', tg.themeParams.button_color);
+  if (tg.themeParams.secondary_bg_color) document.documentElement.style.setProperty('--tg-theme-secondary-bg-color', tg.themeParams.secondary_bg_color);
+}

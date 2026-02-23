@@ -695,6 +695,25 @@ ${itemsText}
     res.json(products);
   });
   app.get('/api/news', (req, res) => res.json(db.prepare('SELECT * FROM news ORDER BY created_at DESC LIMIT 20').all()));
+  
+  // API для заказов пользователя
+  app.get('/api/orders', (req, res) => {
+    const userId = parseInt(req.query.user_id);
+    if (!userId) return res.json([]);
+    
+    const user = db.prepare('SELECT id FROM users WHERE telegram_id = ?').get(userId);
+    if (!user) return res.json([]);
+    
+    const orders = db.prepare('SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC LIMIT 20').all(user.id);
+    
+    // Добавляем товары к каждому заказу
+    orders.forEach(order => {
+      order.items = db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(order.id);
+    });
+    
+    res.json(orders);
+  });
+  
   app.post('/api/validate-promocode', (req, res) => {
     const pc = db.prepare('SELECT * FROM promocodes WHERE code = ? AND is_active = 1').get(req.body.code?.toUpperCase());
     if (!pc) return res.json({ valid: false, error: 'Не найден' });
