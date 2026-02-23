@@ -92,12 +92,12 @@ async function start() {
   
   const existingChannel = db.prepare('SELECT value FROM settings WHERE key = ?').get('channel_id');
   if (!existingChannel) {
-    db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('channel_id', DEFAULT_CHANNEL);
+    db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('channel_id', '@kiopifan');
   }
 
   const existingSubCheck = db.prepare('SELECT value FROM settings WHERE key = ?').get('subscription_enabled');
   if (!existingSubCheck) {
-    db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('subscription_enabled', '1');
+    db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('subscription_enabled', '0');
   }
 
   console.log('=== НАСТРОЙКИ ===');

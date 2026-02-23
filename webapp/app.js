@@ -776,27 +776,18 @@ function formatPrice(price) {
 // === ПРОВЕРКА ПОДПИСКИ ===
 
 async function checkSubscription() {
-  const userId = tg.initDataUnsafe?.user?.id;
-  if (!userId) {
-    // Если нет userId - показываем приложение
+  // Проверяем, нажимал ли уже пользователь кнопку
+  const alreadySubscribed = localStorage.getItem('vapeshop_subscribed');
+  if (alreadySubscribed === '1') {
     showMainApp();
     return;
   }
   
-  try {
-    const res = await fetch(`/api/check-subscription?user_id=${userId}`);
-    const data = await res.json();
-    
-    if (data.subscribed) {
-      showMainApp();
-    } else {
-      showSubscriptionScreen(data.channel);
-    }
-  } catch (e) {
-    console.error('Ошибка проверки подписки:', e);
-    // Если ошибка - показываем приложение
-    showMainApp();
-  }
+  const userId = tg.initDataUnsafe?.user?.id;
+  const channel = '@kiopifan';
+  
+  // Показываем экран подписки (но не требуем её)
+  showSubscriptionScreen(channel);
 }
 
 function showSubscriptionScreen(channel) {
@@ -813,7 +804,9 @@ function showSubscriptionScreen(channel) {
   
   if (checkSubscribeBtn) {
     checkSubscribeBtn.onclick = () => {
-      checkSubscription();
+      // Просто сохраняем что пользователь нажал и пропускаем
+      localStorage.setItem('vapeshop_subscribed', '1');
+      showMainApp();
     };
   }
 }

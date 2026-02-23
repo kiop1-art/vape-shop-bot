@@ -143,6 +143,13 @@ body::before {
   min-height: 20px;
 }
 
+.subscription-note {
+  color: var(--text-tertiary);
+  font-size: 13px;
+  margin-top: 16px;
+  font-style: italic;
+}
+
 /* ===== HEADER ===== */
 .header {
   position: sticky; top: 0; z-index: 100;
