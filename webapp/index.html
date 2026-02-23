@@ -7,7 +7,7 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -15,12 +15,9 @@
     <!-- Header -->
     <header class="header">
       <div class="header-content">
-        <div class="logo">
-          <span class="logo-icon">💨</span>
-          <span class="logo-text">VapeShop</span>
-        </div>
+        <h1 class="logo">VapeShop</h1>
         <button class="cart-btn" id="cartBtn">
-          <svg class="cart-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="9" cy="21" r="1"></circle>
             <circle cx="20" cy="21" r="1"></circle>
             <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
@@ -35,21 +32,22 @@
       <button class="category-btn active" data-category="all">Все</button>
     </nav>
 
-    <!-- Products Grid -->
-    <main class="products-grid" id="productsGrid">
-      <div class="skeleton-loader">
-        <div class="skeleton-card"></div>
-        <div class="skeleton-card"></div>
-        <div class="skeleton-card"></div>
+    <!-- Products -->
+    <main class="products" id="productsGrid">
+      <div class="skeleton-grid">
+        <div class="skeleton-product"></div>
+        <div class="skeleton-product"></div>
+        <div class="skeleton-product"></div>
+        <div class="skeleton-product"></div>
       </div>
     </main>
 
     <!-- Cart Modal -->
     <div class="modal" id="cartModal">
-      <div class="modal-overlay"></div>
-      <div class="modal-content">
+      <div class="modal-backdrop" id="closeCartBackdrop"></div>
+      <div class="modal-container">
         <div class="modal-header">
-          <h2>🛒 Корзина</h2>
+          <h2>Корзина</h2>
           <button class="modal-close" id="closeCart">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -57,18 +55,13 @@
             </svg>
           </button>
         </div>
-        <div class="cart-items" id="cartItems">
-          <div class="empty-cart">
-            <div class="empty-icon">🛒</div>
-            <p>Корзина пуста</p>
+        <div class="modal-body" id="cartItems"></div>
+        <div class="modal-footer">
+          <div class="cart-summary">
+            <span>Итого</span>
+            <span class="cart-total" id="totalPrice">0 ₽</span>
           </div>
-        </div>
-        <div class="cart-footer">
-          <div class="cart-total">
-            <span>Итого:</span>
-            <span class="total-price" id="totalPrice">0 ₽</span>
-          </div>
-          <button class="checkout-btn" id="checkoutBtn">
+          <button class="btn-primary btn-checkout" id="checkoutBtn">
             Оформить заказ
           </button>
         </div>
@@ -77,10 +70,10 @@
 
     <!-- Checkout Modal -->
     <div class="modal" id="checkoutModal">
-      <div class="modal-overlay"></div>
-      <div class="modal-content">
+      <div class="modal-backdrop" id="closeCheckoutBackdrop"></div>
+      <div class="modal-container">
         <div class="modal-header">
-          <h2>📝 Оформление</h2>
+          <h2>Оформление</h2>
           <button class="modal-close" id="closeCheckout">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -88,53 +81,33 @@
             </svg>
           </button>
         </div>
-        <form class="checkout-form" id="checkoutForm">
+        <form class="modal-body checkout-form" id="checkoutForm">
           <div class="form-group">
-            <label for="contactInfo">
-              <span class="label-icon">📞</span>
-              Контакты
-            </label>
+            <label>Контакты</label>
             <input type="text" id="contactInfo" placeholder="@username или телефон" required>
           </div>
           <div class="form-group">
-            <label for="deliveryAddress">
-              <span class="label-icon">📍</span>
-              Адрес доставки
-            </label>
-            <textarea id="deliveryAddress" placeholder="Город, улица, дом, квартира" rows="3"></textarea>
+            <label>Адрес доставки</label>
+            <textarea id="deliveryAddress" placeholder="Город, улица, дом" rows="2"></textarea>
           </div>
           <div class="form-group">
-            <label for="comment">
-              <span class="label-icon">💬</span>
-              Комментарий
-            </label>
+            <label>Комментарий</label>
             <textarea id="comment" placeholder="Пожелания к заказу" rows="2"></textarea>
           </div>
-          <div class="order-summary">
-            <h3>📦 Состав заказа</h3>
-            <div id="orderSummary"></div>
+          <div class="order-summary" id="orderSummary"></div>
+          <div class="cart-summary">
+            <span>К оплате</span>
+            <span class="cart-total" id="totalAmount">0 ₽</span>
           </div>
-          <div class="checkout-total">
-            <span>К оплате:</span>
-            <span class="total-amount" id="totalAmount">0 ₽</span>
-          </div>
-          <button type="submit" class="confirm-btn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="20 6 9 17 4 12"></polyline>
-            </svg>
+          <button type="submit" class="btn-primary">
             Подтвердить заказ
           </button>
         </form>
       </div>
     </div>
 
-    <!-- Toast Notification -->
+    <!-- Toast -->
     <div class="toast" id="toast"></div>
-
-    <!-- Loading Spinner -->
-    <div class="loader" id="loader">
-      <div class="spinner"></div>
-    </div>
   </div>
 
   <script src="app.js"></script>

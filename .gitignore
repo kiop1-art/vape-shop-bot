@@ -1,5 +1,7 @@
 node_modules/
 .env
-shop.db
+*.db
+uploads/*
+!uploads/.gitkeep
 *.log
 .DS_Store

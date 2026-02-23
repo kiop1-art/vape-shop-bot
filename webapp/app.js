@@ -1,14 +1,11 @@
-// Инициализация Telegram WebApp
 const tg = window.Telegram.WebApp;
 tg.ready();
 tg.expand();
 
-// Состояние приложения
 let cart = [];
 let products = [];
 let categories = [];
 
-// DOM элементы
 const categoriesEl = document.getElementById('categories');
 const productsGrid = document.getElementById('productsGrid');
 const cartBtn = document.getElementById('cartBtn');
@@ -18,23 +15,22 @@ const cartItems = document.getElementById('cartItems');
 const totalPrice = document.getElementById('totalPrice');
 const checkoutBtn = document.getElementById('checkoutBtn');
 const closeCart = document.getElementById('closeCart');
+const closeCartBackdrop = document.getElementById('closeCartBackdrop');
 const checkoutModal = document.getElementById('checkoutModal');
 const closeCheckout = document.getElementById('closeCheckout');
+const closeCheckoutBackdrop = document.getElementById('closeCheckoutBackdrop');
 const checkoutForm = document.getElementById('checkoutForm');
 const orderSummary = document.getElementById('orderSummary');
 const totalAmount = document.getElementById('totalAmount');
 const toast = document.getElementById('toast');
-const loader = document.getElementById('loader');
 
 // === ЗАГРУЗКА ДАННЫХ ===
 
 async function loadCategories() {
   try {
-    const response = await fetch('/api/categories');
-    categories = await response.json();
-    if (categories.length === 0) throw new Error('Нет категорий');
-  } catch (error) {
-    console.error('Ошибка загрузки категорий:', error);
+    const res = await fetch('/api/categories');
+    categories = await res.json();
+  } catch (e) {
     categories = [
       { id: 1, name: '💧 Жидкости' },
       { id: 2, name: '🔥 Поды' },
@@ -46,31 +42,24 @@ async function loadCategories() {
 }
 
 async function loadProducts(categoryId = null) {
-  showLoader();
   try {
-    const url = categoryId 
-      ? `/api/products?category_id=${categoryId}` 
-      : '/api/products';
-    const response = await fetch(url);
-    products = await response.json();
-  } catch (error) {
-    console.error('Ошибка загрузки товаров:', error);
+    const url = categoryId ? `/api/products?category_id=${categoryId}` : '/api/products';
+    const res = await fetch(url);
+    products = await res.json();
+  } catch (e) {
     products = getDemoProducts();
   }
-  hideLoader();
   renderProducts();
 }
 
 function getDemoProducts() {
   return [
-    { id: 1, category_id: 1, name: 'Husky Double Ice', description: 'Ледяной манго-маракуйя', price: 450, stock: 50 },
-    { id: 2, category_id: 1, name: 'Brusko Berry', description: 'Смесь лесных ягод с прохладой', price: 390, stock: 30 },
-    { id: 3, category_id: 1, name: 'SALTIC Lemon', description: 'Свежий лимон с мятой и льдом', price: 420, stock: 45 },
-    { id: 4, category_id: 2, name: 'Vaporesso XROS 3', description: 'Компактный под-система', price: 2490, stock: 15 },
-    { id: 5, category_id: 2, name: 'Voopoo V.Thru', description: 'Стильный POD с керамикой', price: 1990, stock: 20 },
-    { id: 6, category_id: 3, name: 'Испарители XROS 0.6Ω', description: 'Комплект из 4 шт', price: 890, stock: 100 },
-    { id: 7, category_id: 3, name: 'Картриджи V.Thru', description: 'Комплект из 3 шт', price: 650, stock: 80 },
-    { id: 8, category_id: 4, name: 'Стартовый набор', description: 'XROS 3 + 2 жидкости', price: 2990, stock: 10 }
+    { id: 1, category_id: 1, name: 'Husky Double Ice', description: 'Ледяной манго-маракуйя', price: 450, image_url: '' },
+    { id: 2, category_id: 1, name: 'Brusko Berry', description: 'Смесь лесных ягод', price: 390, image_url: '' },
+    { id: 3, category_id: 2, name: 'Vaporesso XROS 3', description: 'Компактный под-система', price: 2490, image_url: '' },
+    { id: 4, category_id: 2, name: 'Voopoo V.Thru', description: 'Стильный POD', price: 1990, image_url: '' },
+    { id: 5, category_id: 3, name: 'Испарители XROS 0.6Ω', description: '4 шт в упаковке', price: 890, image_url: '' },
+    { id: 6, category_id: 4, name: 'Стартовый набор', description: 'XROS 3 + 2 жидкости', price: 2990, image_url: '' }
   ];
 }
 
@@ -83,7 +72,7 @@ function renderCategories() {
   allBtn.className = 'category-btn active';
   allBtn.textContent = 'Все';
   allBtn.dataset.category = 'all';
-  allBtn.addEventListener('click', () => selectCategory('all'));
+  allBtn.onclick = () => selectCategory('all');
   categoriesEl.appendChild(allBtn);
   
   categories.forEach(cat => {
@@ -91,7 +80,7 @@ function renderCategories() {
     btn.className = 'category-btn';
     btn.textContent = cat.name;
     btn.dataset.category = cat.id;
-    btn.addEventListener('click', () => selectCategory(cat.id));
+    btn.onclick = () => selectCategory(cat.id);
     categoriesEl.appendChild(btn);
   });
 }
@@ -107,22 +96,23 @@ function renderProducts() {
     return;
   }
   
-  productsGrid.innerHTML = products.map(product => `
-    <div class="product-card" data-id="${product.id}">
-      <div class="product-image">${getProductEmoji(product)}</div>
+  productsGrid.innerHTML = `<div class="products-grid">${products.map(p => `
+    <div class="product-card" data-id="${p.id}">
+      <div class="product-image">
+        ${p.image_url && p.image_url !== '/uploads/placeholder.png' 
+          ? `<img src="${p.image_url}" alt="${escapeHtml(p.name)}" onerror="this.style.display='none';this.parentElement.textContent='📦'">`
+          : getProductEmoji(p)}
+      </div>
       <div class="product-info">
-        <h3 class="product-name">${escapeHtml(product.name)}</h3>
-        <p class="product-description">${escapeHtml(product.description)}</p>
+        <h3 class="product-name">${escapeHtml(p.name)}</h3>
+        <p class="product-description">${escapeHtml(p.description)}</p>
         <div class="product-footer">
-          <span class="product-price">${formatPrice(product.price)}</span>
-          <button class="add-to-cart-btn" onclick="addToCart(${product.id})">
-            <span class="add-icon">➕</span>
-            <span>В корзину</span>
-          </button>
+          <span class="product-price">${formatPrice(p.price)}</span>
+          <button class="add-to-cart-btn" onclick="addToCart(${p.id})">+</button>
         </div>
       </div>
     </div>
-  `).join('');
+  `).join('')}</div>`;
 }
 
 function getProductEmoji(product) {
@@ -134,7 +124,7 @@ function renderCart() {
   if (cart.length === 0) {
     cartItems.innerHTML = `
       <div class="empty-cart">
-        <div class="empty-icon">🛒</div>
+        <div class="empty-cart-icon">🛒</div>
         <p>Корзина пуста</p>
       </div>
     `;
@@ -167,7 +157,7 @@ function renderOrderSummary() {
   
   orderSummary.innerHTML = cart.map(item => `
     <div class="order-item">
-      <span>${escapeHtml(item.name)} x${item.quantity}</span>
+      <span>${escapeHtml(item.name)} × ${item.quantity}</span>
       <span>${formatPrice(item.price * item.quantity)}</span>
     </div>
   `).join('');
@@ -181,35 +171,22 @@ function selectCategory(categoryId) {
   document.querySelectorAll('.category-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.category == categoryId);
   });
-  
-  if (categoryId === 'all') {
-    loadProducts();
-  } else {
-    loadProducts(categoryId);
-  }
+  loadProducts(categoryId === 'all' ? null : categoryId);
 }
 
 function addToCart(productId) {
   const product = products.find(p => p.id === productId);
   if (!product) return;
   
-  const existingItem = cart.find(item => item.id === productId);
-  if (existingItem) {
-    existingItem.quantity++;
+  const existing = cart.find(item => item.id === productId);
+  if (existing) {
+    existing.quantity++;
   } else {
-    cart.push({
-      id: product.id,
-      name: product.name,
-      price: product.price,
-      quantity: 1
-    });
+    cart.push({ ...product, quantity: 1 });
   }
   
   renderCart();
-  showToast('✅ Добавлено в корзину', 'success');
-  
-  cartBtn.style.transform = 'scale(1.2)';
-  setTimeout(() => cartBtn.style.transform = 'scale(1)', 200);
+  showToast('Добавлено в корзину', 'success');
   
   if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
 }
@@ -219,7 +196,6 @@ function updateQty(productId, delta) {
   if (!item) return;
   
   item.quantity += delta;
-  
   if (item.quantity <= 0) {
     cart = cart.filter(i => i.id !== productId);
   }
@@ -238,7 +214,6 @@ function updateCartCount() {
 function openCart() {
   renderCart();
   cartModal.classList.add('active');
-  if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
 }
 
 function closeCartModal() {
@@ -247,10 +222,9 @@ function closeCartModal() {
 
 function openCheckout() {
   if (cart.length === 0) {
-    showToast('🛒 Корзина пуста', 'error');
+    showToast('Корзина пуста', 'error');
     return;
   }
-  
   closeCartModal();
   renderOrderSummary();
   checkoutModal.classList.add('active');
@@ -268,7 +242,7 @@ async function submitOrder(e) {
   const comment = document.getElementById('comment').value.trim();
   
   if (!contactInfo) {
-    showToast('📞 Введите контакты', 'error');
+    showToast('Введите контакты', 'error');
     return;
   }
   
@@ -288,49 +262,34 @@ async function submitOrder(e) {
     comment
   };
   
-  showLoader();
-  
   try {
-    const response = await fetch('/api/orders', {
+    const res = await fetch('/api/orders', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(orderData)
     });
     
-    const result = await response.json();
+    const result = await res.json();
     
     if (result.success) {
-      hideLoader();
       closeCheckoutModal();
       cart = [];
       renderCart();
       updateCartCount();
-      showToast('✅ Заказ оформлен!', 'success');
-      
+      showToast('Заказ оформлен!', 'success');
       setTimeout(() => tg.close(), 1500);
     } else {
-      throw new Error('Ошибка при создании заказа');
+      showToast('Ошибка оформления', 'error');
     }
-  } catch (error) {
-    console.error('Ошибка:', error);
-    hideLoader();
-    showToast('❌ Ошибка оформления', 'error');
+  } catch (e) {
+    showToast('Ошибка оформления', 'error');
   }
 }
 
 function showToast(message, type = '') {
   toast.textContent = message;
   toast.className = 'toast show ' + type;
-  
   setTimeout(() => toast.className = 'toast', 3000);
-}
-
-function showLoader() {
-  loader.classList.add('active');
-}
-
-function hideLoader() {
-  loader.classList.remove('active');
 }
 
 function escapeHtml(text) {
@@ -345,27 +304,14 @@ function formatPrice(price) {
 
 // === СОБЫТИЯ ===
 
-cartBtn.addEventListener('click', openCart);
-closeCart.addEventListener('click', closeCartModal);
-checkoutBtn.addEventListener('click', openCheckout);
-closeCheckout.addEventListener('click', closeCheckoutModal);
-checkoutForm.addEventListener('submit', submitOrder);
-
-document.querySelectorAll('.modal-overlay').forEach(overlay => {
-  overlay.addEventListener('click', () => {
-    cartModal.classList.remove('active');
-    checkoutModal.classList.remove('active');
-  });
-});
+cartBtn.onclick = openCart;
+closeCart.onclick = closeCartModal;
+closeCartBackdrop.onclick = closeCartModal;
+checkoutBtn.onclick = openCheckout;
+closeCheckout.onclick = closeCheckoutModal;
+closeCheckoutBackdrop.onclick = closeCheckoutModal;
+checkoutForm.onsubmit = submitOrder;
 
 // Инициализация
 loadCategories();
 loadProducts();
-
-// Настройка темы
-if (tg.themeParams) {
-  if (tg.themeParams.bg_color) document.documentElement.style.setProperty('--tg-theme-bg-color', tg.themeParams.bg_color);
-  if (tg.themeParams.text_color) document.documentElement.style.setProperty('--tg-theme-text-color', tg.themeParams.text_color);
-  if (tg.themeParams.button_color) document.documentElement.style.setProperty('--tg-theme-button-color', tg.themeParams.button_color);
-  if (tg.themeParams.secondary_bg_color) document.documentElement.style.setProperty('--tg-theme-secondary-bg-color', tg.themeParams.secondary_bg_color);
-}

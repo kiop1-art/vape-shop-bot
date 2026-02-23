@@ -1,6 +1,6 @@
 {
   "name": "vape-shop-telegram-bot",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Telegram бот с Mini App для продажи жидкостей, подов и расходников",
   "main": "bot/index.js",
   "scripts": {
@@ -14,6 +14,7 @@
   "dependencies": {
     "node-telegram-bot-api": "^0.64.0",
     "express": "^4.18.2",
+    "multer": "^1.4.5-lts.1",
     "sql.js": "^1.9.0",
     "dotenv": "^16.3.1",
     "uuid": "^9.0.0"
