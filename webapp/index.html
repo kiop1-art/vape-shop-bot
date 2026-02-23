@@ -6,8 +6,7 @@
   <title>VapeShop</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -15,7 +14,10 @@
     <!-- Header -->
     <header class="header">
       <div class="header-content">
-        <h1 class="logo">VapeShop</h1>
+        <div class="logo">
+          <span class="logo-icon">💨</span>
+          <span class="logo-text">VapeShop</span>
+        </div>
         <button class="cart-btn" id="cartBtn">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="9" cy="21" r="1"></circle>
@@ -27,87 +29,91 @@
       </div>
     </header>
 
-    <!-- Categories -->
-    <nav class="categories" id="categories">
-      <button class="category-btn active" data-category="all">Все</button>
+    <!-- Tabs -->
+    <nav class="tabs">
+      <button class="tab-btn active" data-tab="shop">🛒 Магазин</button>
+      <button class="tab-btn" data-tab="news">📰 Новости</button>
     </nav>
 
-    <!-- Products -->
-    <main class="products" id="productsGrid">
-      <div class="skeleton-grid">
-        <div class="skeleton-product"></div>
-        <div class="skeleton-product"></div>
-        <div class="skeleton-product"></div>
-        <div class="skeleton-product"></div>
-      </div>
+    <!-- Categories -->
+    <div class="categories-wrapper" id="categoriesWrapper">
+      <nav class="categories" id="categories"></nav>
+    </div>
+
+    <!-- Shop Tab -->
+    <main class="tab-content active" id="shopTab">
+      <div class="products-grid" id="productsGrid"></div>
+    </main>
+
+    <!-- News Tab -->
+    <main class="tab-content" id="newsTab">
+      <div class="news-grid" id="newsGrid"></div>
     </main>
 
     <!-- Cart Modal -->
     <div class="modal" id="cartModal">
-      <div class="modal-backdrop" id="closeCartBackdrop"></div>
-      <div class="modal-container">
+      <div class="modal-backdrop"></div>
+      <div class="modal-content">
         <div class="modal-header">
           <h2>Корзина</h2>
-          <button class="modal-close" id="closeCart">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="18" y1="6" x2="6" y2="18"></line>
-              <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
-          </button>
+          <button class="modal-close" id="closeCart">×</button>
         </div>
         <div class="modal-body" id="cartItems"></div>
         <div class="modal-footer">
+          <div class="promocode-section">
+            <input type="text" id="promocodeInput" placeholder="Промокод" maxlength="20">
+            <button class="btn-apply" id="applyPromocode">Применить</button>
+          </div>
           <div class="cart-summary">
             <span>Итого</span>
-            <span class="cart-total" id="totalPrice">0 ₽</span>
+            <div class="cart-total-wrapper">
+              <span class="cart-total-old" id="totalOld"></span>
+              <span class="cart-total" id="totalPrice">0 ₽</span>
+            </div>
           </div>
-          <button class="btn-primary btn-checkout" id="checkoutBtn">
-            Оформить заказ
-          </button>
+          <button class="btn-primary" id="checkoutBtn">Оформить заказ</button>
         </div>
       </div>
     </div>
 
     <!-- Checkout Modal -->
     <div class="modal" id="checkoutModal">
-      <div class="modal-backdrop" id="closeCheckoutBackdrop"></div>
-      <div class="modal-container">
+      <div class="modal-backdrop"></div>
+      <div class="modal-content">
         <div class="modal-header">
           <h2>Оформление</h2>
-          <button class="modal-close" id="closeCheckout">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="18" y1="6" x2="6" y2="18"></line>
-              <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
-          </button>
+          <button class="modal-close" id="closeCheckout">×</button>
         </div>
         <form class="modal-body checkout-form" id="checkoutForm">
           <div class="form-group">
-            <label>Контакты</label>
+            <label>📞 Контакты</label>
             <input type="text" id="contactInfo" placeholder="@username или телефон" required>
           </div>
           <div class="form-group">
-            <label>Адрес доставки</label>
+            <label>📍 Адрес доставки</label>
             <textarea id="deliveryAddress" placeholder="Город, улица, дом" rows="2"></textarea>
           </div>
           <div class="form-group">
-            <label>Комментарий</label>
-            <textarea id="comment" placeholder="Пожелания к заказу" rows="2"></textarea>
+            <label>💬 Комментарий</label>
+            <textarea id="comment" placeholder="Пожелания" rows="2"></textarea>
           </div>
           <div class="order-summary" id="orderSummary"></div>
           <div class="cart-summary">
             <span>К оплате</span>
             <span class="cart-total" id="totalAmount">0 ₽</span>
           </div>
-          <button type="submit" class="btn-primary">
-            Подтвердить заказ
-          </button>
+          <button type="submit" class="btn-primary">Подтвердить заказ</button>
         </form>
       </div>
     </div>
 
     <!-- Toast -->
     <div class="toast" id="toast"></div>
+
+    <!-- Loader -->
+    <div class="loader" id="loader">
+      <div class="spinner"></div>
+    </div>
   </div>
 
   <script src="app.js"></script>

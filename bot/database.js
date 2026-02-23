@@ -28,6 +28,7 @@ async function initDatabase() {
       first_name TEXT,
       last_name TEXT,
       is_admin INTEGER DEFAULT 0,
+      is_subscribed INTEGER DEFAULT 1,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -61,6 +62,7 @@ async function initDatabase() {
       delivery_address TEXT,
       contact_info TEXT,
       comment TEXT,
+      promocode TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id)
@@ -77,14 +79,23 @@ async function initDatabase() {
       FOREIGN KEY (product_id) REFERENCES products(id)
     );
 
-    CREATE TABLE IF NOT EXISTS cart (
+    CREATE TABLE IF NOT EXISTS news (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER NOT NULL,
-      product_id INTEGER NOT NULL,
-      quantity INTEGER DEFAULT 1,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-      FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+      title TEXT NOT NULL,
+      content TEXT NOT NULL,
+      image_url TEXT,
+      is_active INTEGER DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS promocodes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      code TEXT UNIQUE NOT NULL,
+      discount INTEGER NOT NULL,
+      max_uses INTEGER,
+      uses_count INTEGER DEFAULT 0,
+      is_active INTEGER DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE INDEX IF NOT EXISTS idx_users_telegram ON users(telegram_id);
@@ -92,7 +103,7 @@ async function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_products_active ON products(is_active);
     CREATE INDEX IF NOT EXISTS idx_orders_user ON orders(user_id);
     CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
-    CREATE INDEX IF NOT EXISTS idx_cart_user ON cart(user_id);
+    CREATE INDEX IF NOT EXISTS idx_promocodes_code ON promocodes(code);
   `);
   
   saveDatabase();
@@ -105,10 +116,6 @@ function saveDatabase() {
     const buffer = Buffer.from(data);
     fs.writeFileSync(DB_PATH, buffer);
   }
-}
-
-function getDb() {
-  return db;
 }
 
 const dbHelpers = {
@@ -144,7 +151,6 @@ const dbHelpers = {
       }
     };
   },
-  
   exec(sql) {
     db.run(sql);
     saveDatabase();

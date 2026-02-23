@@ -5,24 +5,36 @@ tg.expand();
 let cart = [];
 let products = [];
 let categories = [];
+let news = [];
+let currentDiscount = 0;
+let appliedPromocode = null;
 
 const categoriesEl = document.getElementById('categories');
+const categoriesWrapper = document.getElementById('categoriesWrapper');
 const productsGrid = document.getElementById('productsGrid');
+const newsGrid = document.getElementById('newsGrid');
 const cartBtn = document.getElementById('cartBtn');
 const cartCount = document.getElementById('cartCount');
 const cartModal = document.getElementById('cartModal');
 const cartItems = document.getElementById('cartItems');
 const totalPrice = document.getElementById('totalPrice');
+const totalOld = document.getElementById('totalOld');
 const checkoutBtn = document.getElementById('checkoutBtn');
 const closeCart = document.getElementById('closeCart');
-const closeCartBackdrop = document.getElementById('closeCartBackdrop');
+const promocodeInput = document.getElementById('promocodeInput');
+const applyPromocode = document.getElementById('applyPromocode');
 const checkoutModal = document.getElementById('checkoutModal');
 const closeCheckout = document.getElementById('closeCheckout');
-const closeCheckoutBackdrop = document.getElementById('closeCheckoutBackdrop');
 const checkoutForm = document.getElementById('checkoutForm');
 const orderSummary = document.getElementById('orderSummary');
 const totalAmount = document.getElementById('totalAmount');
 const toast = document.getElementById('toast');
+const loader = document.getElementById('loader');
+
+// Tabs
+const tabBtns = document.querySelectorAll('.tab-btn');
+const shopTab = document.getElementById('shopTab');
+const newsTab = document.getElementById('newsTab');
 
 // === ЗАГРУЗКА ДАННЫХ ===
 
@@ -42,6 +54,7 @@ async function loadCategories() {
 }
 
 async function loadProducts(categoryId = null) {
+  showLoader();
   try {
     const url = categoryId ? `/api/products?category_id=${categoryId}` : '/api/products';
     const res = await fetch(url);
@@ -49,17 +62,28 @@ async function loadProducts(categoryId = null) {
   } catch (e) {
     products = getDemoProducts();
   }
+  hideLoader();
   renderProducts();
+}
+
+async function loadNews() {
+  try {
+    const res = await fetch('/api/news');
+    news = await res.json();
+  } catch (e) {
+    news = [];
+  }
+  renderNews();
 }
 
 function getDemoProducts() {
   return [
-    { id: 1, category_id: 1, name: 'Husky Double Ice', description: 'Ледяной манго-маракуйя', price: 450, image_url: '' },
-    { id: 2, category_id: 1, name: 'Brusko Berry', description: 'Смесь лесных ягод', price: 390, image_url: '' },
-    { id: 3, category_id: 2, name: 'Vaporesso XROS 3', description: 'Компактный под-система', price: 2490, image_url: '' },
-    { id: 4, category_id: 2, name: 'Voopoo V.Thru', description: 'Стильный POD', price: 1990, image_url: '' },
-    { id: 5, category_id: 3, name: 'Испарители XROS 0.6Ω', description: '4 шт в упаковке', price: 890, image_url: '' },
-    { id: 6, category_id: 4, name: 'Стартовый набор', description: 'XROS 3 + 2 жидкости', price: 2990, image_url: '' }
+    { id: 1, category_id: 1, name: 'Husky Double Ice', description: 'Ледяной манго-маракуйя', price: 450 },
+    { id: 2, category_id: 1, name: 'Brusko Berry', description: 'Смесь лесных ягод', price: 390 },
+    { id: 3, category_id: 2, name: 'Vaporesso XROS 3', description: 'Компактный под', price: 2490 },
+    { id: 4, category_id: 2, name: 'Voopoo V.Thru', description: 'Стильный POD', price: 1990 },
+    { id: 5, category_id: 3, name: 'Испарители XROS 0.6Ω', description: '4 шт', price: 890 },
+    { id: 6, category_id: 4, name: 'Стартовый набор', description: 'XROS 3 + 2 жидкости', price: 2990 }
   ];
 }
 
@@ -96,10 +120,10 @@ function renderProducts() {
     return;
   }
   
-  productsGrid.innerHTML = `<div class="products-grid">${products.map(p => `
+  productsGrid.innerHTML = products.map(p => `
     <div class="product-card" data-id="${p.id}">
       <div class="product-image">
-        ${p.image_url && p.image_url !== '/uploads/placeholder.png' 
+        ${p.image_url && !p.image_url.includes('placeholder') 
           ? `<img src="${p.image_url}" alt="${escapeHtml(p.name)}" onerror="this.style.display='none';this.parentElement.textContent='📦'">`
           : getProductEmoji(p)}
       </div>
@@ -112,7 +136,32 @@ function renderProducts() {
         </div>
       </div>
     </div>
-  `).join('')}</div>`;
+  `).join('');
+}
+
+function renderNews() {
+  if (news.length === 0) {
+    newsGrid.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">📰</div>
+        <div class="empty-state-text">Новостей пока нет<br>заходите позже</div>
+      </div>
+    `;
+    return;
+  }
+  
+  newsGrid.innerHTML = news.map(n => `
+    <div class="news-card">
+      <div class="news-image">
+        ${n.image_url ? `<img src="${n.image_url}" alt="${escapeHtml(n.title)}">` : '📢'}
+      </div>
+      <div class="news-content">
+        <h3 class="news-title">${escapeHtml(n.title)}</h3>
+        <p class="news-text">${escapeHtml(n.content)}</p>
+        <div class="news-date">${new Date(n.created_at).toLocaleDateString('ru-RU')}</div>
+      </div>
+    </div>
+  `).join('');
 }
 
 function getProductEmoji(product) {
@@ -128,7 +177,7 @@ function renderCart() {
         <p>Корзина пуста</p>
       </div>
     `;
-    totalPrice.textContent = '0 ₽';
+    updateCartTotal();
     return;
   }
   
@@ -147,13 +196,31 @@ function renderCart() {
     </div>
   `).join('');
   
+  updateCartTotal();
+}
+
+function updateCartTotal() {
   const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  totalPrice.textContent = formatPrice(total);
+  const discount = currentDiscount > 0 ? total * (currentDiscount / 100) : 0;
+  const finalTotal = total - discount;
+  
+  if (discount > 0) {
+    totalOld.textContent = formatPrice(total);
+    totalOld.style.display = 'block';
+    totalPrice.textContent = formatPrice(finalTotal);
+  } else {
+    totalOld.textContent = '';
+    totalOld.style.display = 'none';
+    totalPrice.textContent = formatPrice(total);
+  }
+  
   updateCartCount();
 }
 
 function renderOrderSummary() {
   const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const discount = currentDiscount > 0 ? total * (currentDiscount / 100) : 0;
+  const finalTotal = total - discount;
   
   orderSummary.innerHTML = cart.map(item => `
     <div class="order-item">
@@ -162,7 +229,16 @@ function renderOrderSummary() {
     </div>
   `).join('');
   
-  totalAmount.textContent = formatPrice(total);
+  if (discount > 0) {
+    orderSummary.innerHTML += `
+      <div class="order-item" style="color: var(--primary)">
+        <span>Скидка ${currentDiscount}%</span>
+        <span>-${formatPrice(discount)}</span>
+      </div>
+    `;
+  }
+  
+  totalAmount.textContent = formatPrice(finalTotal);
 }
 
 // === ФУНКЦИИ ===
@@ -234,6 +310,20 @@ function closeCheckoutModal() {
   checkoutModal.classList.remove('active');
 }
 
+async function validatePromocode(code) {
+  try {
+    const res = await fetch('/api/validate-promocode', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code })
+    });
+    const result = await res.json();
+    return result;
+  } catch (e) {
+    return { valid: false, error: 'Ошибка проверки' };
+  }
+}
+
 async function submitOrder(e) {
   e.preventDefault();
   
@@ -247,6 +337,8 @@ async function submitOrder(e) {
   }
   
   const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const discount = currentDiscount > 0 ? total * (currentDiscount / 100) : 0;
+  const finalTotal = total - discount;
   
   const orderData = {
     userId: tg.initDataUnsafe?.user?.id || 0,
@@ -256,11 +348,14 @@ async function submitOrder(e) {
       price: item.price,
       quantity: item.quantity
     })),
-    totalAmount: total,
+    totalAmount: finalTotal,
     deliveryAddress,
     contactInfo,
-    comment
+    comment,
+    promocode: appliedPromocode
   };
+  
+  showLoader();
   
   try {
     const res = await fetch('/api/orders', {
@@ -274,8 +369,11 @@ async function submitOrder(e) {
     if (result.success) {
       closeCheckoutModal();
       cart = [];
+      currentDiscount = 0;
+      appliedPromocode = null;
+      promocodeInput.value = '';
       renderCart();
-      updateCartCount();
+      updateCartTotal();
       showToast('Заказ оформлен!', 'success');
       setTimeout(() => tg.close(), 1500);
     } else {
@@ -292,6 +390,14 @@ function showToast(message, type = '') {
   setTimeout(() => toast.className = 'toast', 3000);
 }
 
+function showLoader() {
+  loader.classList.add('active');
+}
+
+function hideLoader() {
+  loader.classList.remove('active');
+}
+
 function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
@@ -304,13 +410,57 @@ function formatPrice(price) {
 
 // === СОБЫТИЯ ===
 
+// Переключение табов
+tabBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    tabBtns.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    
+    const tabName = btn.dataset.tab;
+    
+    if (tabName === 'shop') {
+      shopTab.classList.add('active');
+      newsTab.classList.remove('active');
+      categoriesWrapper.style.display = 'block';
+    } else {
+      shopTab.classList.remove('active');
+      newsTab.classList.add('active');
+      categoriesWrapper.style.display = 'none';
+      loadNews();
+    }
+    
+    if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+  });
+});
+
 cartBtn.onclick = openCart;
 closeCart.onclick = closeCartModal;
-closeCartBackdrop.onclick = closeCartModal;
+document.querySelector('#cartModal .modal-backdrop').onclick = closeCartModal;
 checkoutBtn.onclick = openCheckout;
 closeCheckout.onclick = closeCheckoutModal;
-closeCheckoutBackdrop.onclick = closeCheckoutModal;
+document.querySelector('#checkoutModal .modal-backdrop').onclick = closeCheckoutModal;
 checkoutForm.onsubmit = submitOrder;
+
+// Промокод
+applyPromocode.onclick = async () => {
+  const code = promocodeInput.value.trim();
+  if (!code) {
+    showToast('Введите промокод', 'error');
+    return;
+  }
+  
+  const result = await validatePromocode(code);
+  
+  if (result.valid) {
+    currentDiscount = result.discount;
+    appliedPromocode = code.toUpperCase();
+    updateCartTotal();
+    showToast(`Скидка ${result.discount}% применена!`, 'success');
+    promocodeInput.value = '';
+  } else {
+    showToast(result.error || 'Неверный промокод', 'error');
+  }
+};
 
 // Инициализация
 loadCategories();
