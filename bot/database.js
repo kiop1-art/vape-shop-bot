@@ -9,7 +9,6 @@ let db = null;
 async function initDatabase() {
   const SQL = await initSqlJs();
   
-  // Загружаем существующую БД или создаем новую
   try {
     if (fs.existsSync(DB_PATH)) {
       const fileBuffer = fs.readFileSync(DB_PATH);
@@ -21,9 +20,7 @@ async function initDatabase() {
     db = new SQL.Database();
   }
   
-  // Создаем таблицы
   db.run(`
-    -- Пользователи
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       telegram_id INTEGER UNIQUE NOT NULL,
@@ -34,7 +31,6 @@ async function initDatabase() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
-    -- Категории товаров
     CREATE TABLE IF NOT EXISTS categories (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
@@ -43,7 +39,6 @@ async function initDatabase() {
       sort_order INTEGER DEFAULT 0
     );
 
-    -- Товары
     CREATE TABLE IF NOT EXISTS products (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       category_id INTEGER,
@@ -57,7 +52,6 @@ async function initDatabase() {
       FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
     );
 
-    -- Заказы
     CREATE TABLE IF NOT EXISTS orders (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       order_uuid TEXT UNIQUE NOT NULL,
@@ -72,7 +66,6 @@ async function initDatabase() {
       FOREIGN KEY (user_id) REFERENCES users(id)
     );
 
-    -- Элементы заказа
     CREATE TABLE IF NOT EXISTS order_items (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       order_id INTEGER NOT NULL,
@@ -84,7 +77,6 @@ async function initDatabase() {
       FOREIGN KEY (product_id) REFERENCES products(id)
     );
 
-    -- Корзина (временная)
     CREATE TABLE IF NOT EXISTS cart (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
@@ -95,7 +87,6 @@ async function initDatabase() {
       FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
     );
 
-    -- Создаем индексы
     CREATE INDEX IF NOT EXISTS idx_users_telegram ON users(telegram_id);
     CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id);
     CREATE INDEX IF NOT EXISTS idx_products_active ON products(is_active);
@@ -120,20 +111,19 @@ function getDb() {
   return db;
 }
 
-// Хелперы для работы с БД
 const dbHelpers = {
   prepare(sql) {
     return {
       run(...params) {
         const stmt = db.prepare(sql);
-        stmt.run(params);
+        stmt.run(params.map(p => p === undefined ? null : p));
         stmt.free();
         saveDatabase();
         return { lastInsertRowid: db.exec("SELECT last_insert_rowid()")[0]?.values[0]?.[0] };
       },
       get(...params) {
         const stmt = db.prepare(sql);
-        stmt.bind(params);
+        stmt.bind(params.map(p => p === undefined ? null : p));
         if (stmt.step()) {
           const row = stmt.getAsObject();
           stmt.free();
@@ -144,7 +134,7 @@ const dbHelpers = {
       },
       all(...params) {
         const stmt = db.prepare(sql);
-        stmt.bind(params);
+        stmt.bind(params.map(p => p === undefined ? null : p));
         const results = [];
         while (stmt.step()) {
           results.push(stmt.getAsObject());

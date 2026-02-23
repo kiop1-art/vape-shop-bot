@@ -28,8 +28,18 @@ async function start() {
   
   function registerUser(userId, username, firstName, lastName) {
     try {
-      db.prepare(`INSERT OR IGNORE INTO users (telegram_id, username, first_name, last_name) VALUES (?, ?, ?, ?)`).run(userId, username, firstName, lastName);
-      db.prepare(`UPDATE users SET username = ?, first_name = ?, last_name = ? WHERE telegram_id = ?`).run(username, firstName, lastName, userId);
+      db.prepare(`INSERT OR IGNORE INTO users (telegram_id, username, first_name, last_name) VALUES (?, ?, ?, ?)`).run(
+        userId || 0, 
+        username || null, 
+        firstName || null, 
+        lastName || null
+      );
+      db.prepare(`UPDATE users SET username = ?, first_name = ?, last_name = ? WHERE telegram_id = ?`).run(
+        username || null,
+        firstName || null,
+        lastName || null,
+        userId || 0
+      );
     } catch (e) { console.error('Ошибка регистрации:', e); }
   }
 
