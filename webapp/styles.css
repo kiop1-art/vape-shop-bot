@@ -249,6 +249,44 @@ body::before {
 /* ===== ORDERS ===== */
 .orders-list { display: flex; flex-direction: column; gap: 12px; }
 
+/* Order Filters */
+.order-filters {
+  display: flex;
+  gap: 8px;
+  padding: 12px 20px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-bottom: var(--border);
+  background: rgba(10, 10, 15, 0.3);
+}
+
+.order-filters::-webkit-scrollbar { display: none; }
+
+.filter-btn {
+  background: var(--bg-glass-card);
+  border: var(--border);
+  color: var(--text-secondary);
+  padding: 10px 16px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.3s;
+}
+
+.filter-btn:hover {
+  background: var(--bg-glass);
+  color: var(--text-primary);
+}
+
+.filter-btn.active {
+  background: var(--gradient-primary);
+  color: #000;
+  border-color: transparent;
+  box-shadow: var(--shadow-glow);
+}
+
 .order-card {
   background: var(--bg-glass-card);
   border: var(--border);

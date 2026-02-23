@@ -7,6 +7,7 @@ let products = [];
 let categories = [];
 let news = [];
 let orders = [];
+let currentFilter = 'all';
 let currentDiscount = 0;
 let appliedPromocode = null;
 
@@ -216,17 +217,27 @@ function renderProducts() {
 function renderOrders() {
   if (!ordersList) return;
   
-  if (orders.length === 0) {
+  // Фильтрация заказов
+  const filteredOrders = getFilteredOrders(currentFilter);
+  
+  if (filteredOrders.length === 0) {
+    const filterNames = {
+      'all': 'заказов',
+      'pending': 'новых заказов',
+      'confirmed': 'принятых заказов',
+      'completed': 'завершённых заказов'
+    };
+    
     ordersList.innerHTML = `
       <div class="empty-state">
         <div class="empty-state-icon">📦</div>
-        <div class="empty-state-text">У вас пока нет заказов</div>
+        <div class="empty-state-text">У вас нет ${filterNames[currentFilter] || 'заказов'}</div>
       </div>
     `;
     return;
   }
   
-  ordersList.innerHTML = orders.map(order => {
+  ordersList.innerHTML = filteredOrders.map(order => {
     const status = statusLabels[order.status] || { text: order.status, color: '#888' };
     return `
       <div class="order-card" onclick="showOrderDetail(${order.id})">
@@ -241,6 +252,14 @@ function renderOrders() {
       </div>
     `;
   }).join('');
+}
+
+function getFilteredOrders(filter) {
+  if (filter === 'all') return orders;
+  if (filter === 'pending') return orders.filter(o => o.status === 'pending');
+  if (filter === 'confirmed') return orders.filter(o => o.status === 'confirmed' || o.status === 'shipping');
+  if (filter === 'completed') return orders.filter(o => o.status === 'completed');
+  return orders;
 }
 
 function showOrderDetail(orderId) {
@@ -265,53 +284,81 @@ function showOrderDetail(orderId) {
       <div class="status-badge" style="background: ${status.color}20; color: ${status.color}; border-color: ${status.color}">
         ${status.text}
       </div>
-      
+
       <div class="detail-section">
         <h4>📅 Дата заказа</h4>
         <p>${formatEkaterinburgTime(order.created_at)}</p>
       </div>
-      
+
       <div class="detail-section">
         <h4>💰 Сумма</h4>
         <p class="price-large">${formatPrice(order.total_amount)}</p>
       </div>
-      
+
       ${order.contact_info ? `
       <div class="detail-section">
         <h4>📞 Контакты</h4>
         <p>${escapeHtml(order.contact_info)}</p>
       </div>
       ` : ''}
-      
+
       ${order.delivery_address ? `
       <div class="detail-section">
         <h4>📍 Адрес</h4>
         <p>${escapeHtml(order.delivery_address)}</p>
       </div>
       ` : ''}
-      
+
       ${order.comment ? `
       <div class="detail-section">
         <h4>💬 Комментарий</h4>
         <p>${escapeHtml(order.comment)}</p>
       </div>
       ` : ''}
-      
+
       ${order.promocode ? `
       <div class="detail-section">
         <h4>🎁 Промокод</h4>
         <p>${escapeHtml(order.promocode)}</p>
       </div>
       ` : ''}
-      
+
       <div class="detail-section">
         <h4>🛒 Товары</h4>
         <div class="order-items">${itemsHtml}</div>
       </div>
+
+      ${order.status === 'completed' ? `<button class="btn-primary" onclick="repeatOrder(${order.id})" style="margin-top: 16px;">🔄 Повторить заказ</button>` : ''}
     </div>
   `;
-  
+
   orderDetailModal.classList.add('active');
+}
+
+function repeatOrder(orderId) {
+  const order = orders.find(o => o.id === orderId);
+  if (!order || !order.items) return;
+  
+  order.items.forEach(item => {
+    const existing = cart.find(c => c.id === item.product_id);
+    if (existing) {
+      existing.quantity += item.quantity;
+    } else {
+      cart.push({
+        id: item.product_id,
+        name: item.product_name,
+        price: item.price,
+        quantity: item.quantity
+      });
+    }
+  });
+  
+  renderCart();
+  updateCartTotal();
+  orderDetailModal.classList.remove('active');
+  showToast('✅ Товары добавлены в корзину', 'success');
+  
+  if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('success');
 }
 
 function renderNews() {
@@ -596,6 +643,22 @@ function formatPrice(price) {
 
 // === СОБЫТИЯ ===
 
+// Фильтры заказов
+const orderFilters = document.getElementById('orderFilters');
+if (orderFilters) {
+  orderFilters.addEventListener('click', (e) => {
+    if (e.target.classList.contains('filter-btn')) {
+      document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+      e.target.classList.add('active');
+      currentFilter = e.target.dataset.filter;
+      renderOrders();
+      
+      if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+    }
+  });
+}
+
+// Переключение табов
 tabBtns.forEach(btn => {
   btn.addEventListener('click', () => {
     tabBtns.forEach(b => b.classList.remove('active'));
