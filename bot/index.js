@@ -75,10 +75,15 @@ async function start() {
   }
 
   async function checkSubscription(userId) {
+    // Всегда возвращаем true (отключаем проверку)
+    // Чтобы включить - раскомментируй код ниже:
+    /*
     try {
       const member = await bot.getChatMember(CHANNEL_ID.replace('@', ''), userId);
       return ['member', 'administrator', 'creator'].includes(member.status);
     } catch (e) { return false; }
+    */
+    return true;
   }
 
   function isAdmin(userId) { 
